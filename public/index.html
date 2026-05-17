@@ -1812,6 +1812,8 @@ function updateAgentUI() {
     rtIsConnected=false; rtIsSpeaking=false; rtTranscriptBuffer='';
     rtStopMicrophone(); setOrb(''); setStatus('Disconnected');
     connectBtn.disabled=false; disconnectBtn.disabled=true; rtWs=null;
+    // Free the session slot immediately (don't wait for DynamoDB TTL)
+    fetch('/api/session/end', { method: 'POST', headers: authHeaders() }).catch(() => {});
   }
 
   function handleRealtimeEvent(ev) {
@@ -1947,11 +1949,11 @@ function updateAgentUI() {
       rtWs.onerror = (err) => { log('error','WebSocket error'); console.error(err); };
       rtWs.onclose = (ev) => {
         log('ws',`WebSocket closed (${ev.code})`);
-        const unexpected = rtIsConnected && ev.code!==1000;
         rtCleanup();
-        if (unexpected && (ev.code===1005||ev.code===1006)) {
-          log('ws','Session timed out — reconnecting in 2s…'); setStatus('Reconnecting…');
-          connectBtn.disabled=true; setTimeout(()=>{ if(!rtIsConnected) connectBtn.click(); },2000);
+        // Token expired (1001/1008) — inform user, no auto-reconnect
+        if (ev.code === 1001 || ev.code === 1008 || ev.code === 4000) {
+          log('ws','⏱️ Session time limit reached. <a href="/upgrade">Buy a new pass →</a>');
+          setStatus('Session ended');
         }
       };
     } catch (err) { log('error',err.message); setStatus('Connection failed'); setOrb(''); connectBtn.disabled=false; }

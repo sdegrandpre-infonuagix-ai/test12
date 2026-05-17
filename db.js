@@ -481,6 +481,41 @@ async function getUsageSummary({ userId, from, to } = {}) {
 }
 
 // ══════════════════════════════════════════
+//  Active Realtime Session Guard
+//  One concurrent realtime session per user.
+//  DynamoDB TTL auto-deletes the record when the token expires.
+// ══════════════════════════════════════════
+
+async function setActiveSession(phone, type, durationSeconds) {
+  if (!doc) return;
+  const now = Date.now();
+  const expiresAt = new Date(now + durationSeconds * 1000).toISOString();
+  const ttl = Math.floor(now / 1000) + durationSeconds + 120; // DynamoDB auto-deletes after TTL
+  await doc.send(new PutCommand({
+    TableName: TABLE,
+    Item: { pk: `USER#${phone}`, sk: 'ACTIVE_SESSION', type, expiresAt, ttl, createdAt: new Date(now).toISOString() },
+  }));
+  return expiresAt;
+}
+
+async function getActiveSession(phone) {
+  if (!doc) return null;
+  const r = await doc.send(new GetCommand({
+    TableName: TABLE, Key: { pk: `USER#${phone}`, sk: 'ACTIVE_SESSION' },
+  }));
+  if (!r.Item) return null;
+  if (new Date(r.Item.expiresAt) <= new Date()) return null; // expired but TTL not yet fired
+  return r.Item;
+}
+
+async function clearActiveSession(phone) {
+  if (!doc) return;
+  await doc.send(new DeleteCommand({
+    TableName: TABLE, Key: { pk: `USER#${phone}`, sk: 'ACTIVE_SESSION' },
+  }));
+}
+
+// ══════════════════════════════════════════
 
 module.exports = {
   init, isReady, getLastError, MAX_LEVEL,
@@ -495,4 +530,6 @@ module.exports = {
   // Plan & Billing
   setUserPlan, setStripeCustomerId,
   logUsage, getUsageSummary,
+  // Realtime session guard
+  setActiveSession, getActiveSession, clearActiveSession,
 };
