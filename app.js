@@ -1165,6 +1165,42 @@ app.get('/api/billing/status', requireAuth, async (req, res) => {
 //  Creates a Stripe Checkout Session for a one-time 3-hour Deluxe pass
 // ──────────────────────────────────────────────
 const DELUXE_DURATION_HOURS = 3;
+const MONTHLY_PRICE_ID = process.env.STRIPE_MONTHLY_SUBSCRIPTION_PRICE_ID;
+
+// ──────────────────────────────────────────────
+//  Billing — POST /api/billing/create-subscription
+//  Creates a Stripe Checkout Session for the Standard monthly plan
+// ──────────────────────────────────────────────
+app.post('/api/billing/create-subscription', requireAuth, async (req, res) => {
+  if (!STRIPE_SECRET_KEY) return res.status(503).json({ error: 'Stripe not configured' });
+  if (!MONTHLY_PRICE_ID) return res.status(503).json({ error: 'Monthly plan not configured' });
+  try {
+    const stripe = require('stripe')(STRIPE_SECRET_KEY);
+    const user = await db.getUserById(req.user.phone);
+    const baseUrl = process.env.BASE_URL || 'https://test12.net';
+    let customerId = user?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        metadata: { userId: req.user.phone, displayName: user?.displayName || '' },
+      });
+      customerId = customer.id;
+      await db.setStripeCustomerId(req.user.phone, customerId);
+    }
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: MONTHLY_PRICE_ID, quantity: 1 }],
+      success_url: `${baseUrl}/?subscribed=1`,
+      cancel_url:  `${baseUrl}/upgrade`,
+      metadata: { userId: req.user.phone },
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Stripe subscription checkout error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const DELUXE_PRICE_IDS = {
   'xai':          process.env.STRIPE_DELUXE_XAI_PRICE_ID,
@@ -1224,7 +1260,7 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
   try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      // Only handle successful payments (not subscriptions)
+      // One-time Deluxe pass
       if (session.payment_status === 'paid' && session.mode === 'payment') {
         const userId = session.metadata?.userId;
         const deluxeType = session.metadata?.deluxeType || 'xai';
@@ -1233,6 +1269,24 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
           await db.setUserPlan(userId, 'deluxe', null, expiresAt, deluxeType);
           console.log(`Stripe: user ${userId} → Deluxe[${deluxeType}] for ${DELUXE_DURATION_HOURS}h (expires ${expiresAt})`);
         }
+      }
+      // Monthly subscription activated
+      if (session.mode === 'subscription' && session.subscription) {
+        const userId = session.metadata?.userId;
+        if (userId) {
+          await db.setUserPlan(userId, 'standard', session.subscription);
+          console.log(`Stripe: user ${userId} → Standard subscription ${session.subscription}`);
+        }
+      }
+    }
+    // Subscription cancelled / payment failed → downgrade to free
+    if (event.type === 'customer.subscription.deleted') {
+      const sub = event.data.object;
+      // Find user by stripeCustomerId
+      const userId = sub.metadata?.userId || null;
+      if (userId) {
+        await db.setUserPlan(userId, 'standard', null);
+        console.log(`Stripe: subscription ${sub.id} cancelled — user ${userId} downgraded`);
       }
     }
   } catch (err) {
