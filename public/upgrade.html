@@ -148,8 +148,8 @@
 <body>
   <div class="upgrade-card">
     <div class="badge">⭐ Deluxe</div>
-    <h1>Upgrade to Deluxe Voice</h1>
-    <p class="subtitle">Unlock xAI Grok's premium real-time voice engine — the lowest-latency, highest-quality AI voice experience available.</p>
+    <h1>3 Hours of Deluxe Voice</h1>
+    <p class="subtitle">Unlock xAI Grok's premium real-time voice engine for 3 hours — the lowest-latency, highest-quality AI voice experience available.</p>
 
     <div class="features">
       <div class="feature">
@@ -195,11 +195,11 @@
     </div>
 
     <div class="pricing">
-      <div class="pricing-amount" id="price-display">$9.99</div>
-      <div class="pricing-period">per month — cancel anytime</div>
+      <div class="pricing-amount" id="price-display">$4.99</div>
+      <div class="pricing-period">one-time · 3 hours of Deluxe access · no subscription</div>
     </div>
 
-    <button class="btn-upgrade" id="upgrade-btn">Upgrade to Deluxe →</button>
+    <button class="btn-upgrade" id="upgrade-btn">Buy 3-Hour Deluxe Pass →</button>
     <div id="status-msg"></div>
     <br>
     <button class="btn-back" onclick="window.location.href='/'">← Back to Test12</button>
@@ -238,7 +238,7 @@
     // Handle success redirect from Stripe
     if (new URLSearchParams(window.location.search).get('upgraded') === '1') {
       statusMsg.classList.add('success');
-      statusMsg.textContent = '🎉 Welcome to Deluxe! Refresh the app to activate your new plan.';
+      statusMsg.textContent = '🎉 Access granted! You have 3 hours of Deluxe voice. Reload the app to activate.';
     }
   </script>
 </body>

@@ -396,10 +396,18 @@ async function getUserById(phone) {
 //  Plan & Stripe
 // ══════════════════════════════════════════
 
-async function setUserPlan(phone, plan, stripeSubscriptionId) {
+async function setUserPlan(phone, plan, stripeSubscriptionId, deluxeExpiresAt) {
   if (!doc) return;
   const upd = { ':p': plan, ':t': new Date().toISOString() };
   let expr = 'SET #plan = :p, updatedAt = :t';
+  // Store expiry for one-time Deluxe passes
+  if (deluxeExpiresAt) {
+    upd[':e'] = deluxeExpiresAt;
+    expr += ', deluxeExpiresAt = :e';
+  } else if (plan === 'standard') {
+    // Clear expiry on downgrade
+    expr += ' REMOVE deluxeExpiresAt';
+  }
   if (stripeSubscriptionId !== undefined) {
     if (stripeSubscriptionId) { upd[':s'] = stripeSubscriptionId; expr += ', stripeSubscriptionId = :s'; }
     else { expr += ' REMOVE stripeSubscriptionId'; }
