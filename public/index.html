@@ -48,7 +48,21 @@
       max-width: 640px;
       text-align: center;
       padding: 2.5rem 1.5rem 1rem;
+      position: relative;
     }
+    .header-login-link {
+      position: absolute;
+      top: 1.2rem; right: 1.5rem;
+      font-size: 0.85rem; font-weight: 600;
+      color: #1595b2; text-decoration: none;
+      background: rgba(21,149,178,0.1);
+      border: 1px solid rgba(21,149,178,0.3);
+      border-radius: 8px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .header-login-link:hover { background: rgba(21,149,178,0.2); border-color: rgba(21,149,178,0.6); }
     header h1 {
       font-size: 1.5rem;
       font-weight: 700;
@@ -560,6 +574,8 @@
       })()" style="background:rgba(21,149,178,0.15);border:1px solid rgba(21,149,178,0.4);color:#1595b2;font-size:0.75rem;padding:2px 8px;border-radius:6px;cursor:pointer;font-family:inherit;">🔑</button>
       <span id="pwd-reveal" style="display:none;font-weight:900;color:#22c55e;letter-spacing:0.2em;font-size:0.95rem;margin-left:4px"></span>
     </div>
+    <!-- Log in link — shown when not logged in -->
+    <a id="header-login-link" class="header-login-link" href="#" style="display:none">Log in</a>
     <p>
       Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, reply to a post, reply to a reply, create private channels and invite a friends through SMS to a private channel. I support 25 languages!
     </p>
@@ -1025,6 +1041,8 @@ logoutBtn.addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
   clearAuthSession();
   profileBadge.style.display = 'none';
+  const hll = document.getElementById('header-login-link');
+  if (hll) hll.style.display = '';
   showLoginModal();
 });
 
@@ -1032,6 +1050,9 @@ function onLoggedIn() {
   const label = currentUser.displayName || currentUser.phone;
   profileName.textContent = label;
   profileBadge.style.display = 'flex';
+  // Hide the Log in link when authenticated
+  const hll = document.getElementById('header-login-link');
+  if (hll) hll.style.display = 'none';
   hideLoginModal();
   if (currentUser.phone) saveProfileToHistory(currentUser.phone, currentUser.displayName);
   // Save USERID to datalist history
@@ -1193,8 +1214,12 @@ function getGpsPlusCode() {
     } catch (_) {}
     clearAuthSession();
   }
-  // No valid session — show login modal and wait for user action
-  showLoginModal();
+  // No valid session — show Log in link instead of auto-popup
+  const hll = document.getElementById('header-login-link');
+  if (hll) {
+    hll.style.display = '';
+    hll.addEventListener('click', (e) => { e.preventDefault(); showLoginModal(); });
+  }
 })();
 
 
