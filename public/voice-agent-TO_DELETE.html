@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test12 — Voice Agent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Real-time voice agent powered by xAI Grok, connected to Test12 MCP tools for voice-first social posting.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #050810;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Ambient background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -40%; left: -20%;
+      width: 140%; height: 140%;
+      background: radial-gradient(ellipse at 30% 20%, rgba(59,130,246,0.08) 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 80%, rgba(139,92,246,0.06) 0%, transparent 50%);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    header {
+      width: 100%;
+      max-width: 640px;
+      text-align: center;
+      padding: 2.5rem 1.5rem 1rem;
+    }
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p {
+      margin-top: .5rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    header p a { color: #60a5fa; text-decoration: none; }
+
+    /* ── Main card ── */
+    .agent-card {
+      width: 100%;
+      max-width: 640px;
+      margin: 1rem 1.5rem;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: 20px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    /* ── Orb (voice indicator) ── */
+    .orb-wrap {
+      position: relative;
+      width: 140px; height: 140px;
+      display: flex;
+      align-items: center; justify-content: center;
+    }
+    .orb {
+      width: 100px; height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #3b82f6, #6366f1 60%, #1e1b4b);
+      box-shadow: 0 0 40px rgba(99, 102, 241, 0.25);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .orb.listening {
+      animation: orbPulse 1.4s ease-in-out infinite;
+      box-shadow: 0 0 60px rgba(59, 130, 246, 0.5);
+    }
+    .orb.speaking {
+      animation: orbSpeak 0.6s ease-in-out infinite alternate;
+      background: radial-gradient(circle at 35% 35%, #a78bfa, #7c3aed 60%, #2e1065);
+      box-shadow: 0 0 60px rgba(167, 139, 250, 0.4);
+    }
+    .orb.connecting {
+      animation: orbSpin 2s linear infinite;
+      opacity: 0.6;
+    }
+    @keyframes orbPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+    }
+    @keyframes orbSpeak {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+    @keyframes orbSpin {
+      0% { transform: rotate(0deg) scale(0.95); }
+      100% { transform: rotate(360deg) scale(0.95); }
+    }
+
+    /* Ring around orb */
+    .orb-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(99, 102, 241, 0.15);
+      transition: border-color 0.3s;
+    }
+    .orb.listening ~ .orb-ring { border-color: rgba(59, 130, 246, 0.4); }
+    .orb.speaking ~ .orb-ring { border-color: rgba(167, 139, 250, 0.4); }
+
+    /* ── Status ── */
+    #status {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #94a3b8;
+      text-align: center;
+      min-height: 1.4em;
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 28px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+    }
+    .btn-primary:hover { box-shadow: 0 6px 28px rgba(99, 102, 241, 0.45); }
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+    }
+    .btn-danger:hover { box-shadow: 0 6px 28px rgba(239, 68, 68, 0.45); }
+    .btn-ghost {
+      background: rgba(148, 163, 184, 0.1);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .btn-ghost:hover { background: rgba(148, 163, 184, 0.18); color: #e2e8f0; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Logs ── */
+    .logs-card {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 1.5rem 2rem;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .logs-header {
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+    }
+    .logs-header h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+    }
+    #logs {
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.8rem;
+      line-height: 1.55;
+      scrollbar-width: thin;
+      scrollbar-color: #1e293b transparent;
+    }
+    .log-entry {
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.05);
+      display: flex;
+      gap: 0.5rem;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-tag {
+      flex-shrink: 0;
+      font-weight: 600;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      align-self: flex-start;
+      margin-top: 1px;
+    }
+    .log-tag.ws      { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .log-tag.audio   { background: rgba(16,185,129,0.15); color: #34d399; }
+    .log-tag.tool    { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .log-tag.agent   { background: rgba(139,92,246,0.15); color: #a78bfa; }
+    .log-tag.error   { background: rgba(239,68,68,0.15); color: #f87171; }
+    .log-tag.text    { background: rgba(148,163,184,0.1); color: #94a3b8; }
+    .log-body { color: #cbd5e1; word-break: break-word; }
+    .log-body b { color: #e2e8f0; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🎙️ Test12 Voice Agent</h1>
+    <p>
+      Real-time voice conversation powered by <b>xAI Grok</b>, connected to
+      <a href="https://test12.net">Test12.net</a> via MCP.
+      Tap the button, speak naturally — the agent can read posts, create posts,
+      manage private channels, and more.
+    </p>
+  </header>
+
+  <div class="agent-card">
+    <div class="orb-wrap">
+      <div class="orb" id="orb"></div>
+      <div class="orb-ring"></div>
+    </div>
+    <div id="status">Tap "Connect" to start</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="connect-btn">Connect</button>
+      <button class="btn btn-danger" id="disconnect-btn" disabled>Disconnect</button>
+    </div>
+  </div>
+
+  <div class="logs-card">
+    <div class="logs-header">
+      <h3>Agent Log</h3>
+      <button class="btn btn-ghost" style="padding:4px 12px;font-size:0.7rem;" id="clear-btn">Clear</button>
+    </div>
+    <div id="logs"></div>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  Test12 Voice Agent — xAI Realtime + MCP
+// ═══════════════════════════════════════════════════
+
+const MCP_URL = 'https://test12.net/mcp';
+
+// ── URL Parameters (auto-join mode) ──
+const urlParams = new URLSearchParams(window.location.search);
+const autoChannelId = urlParams.get('private_channel_id');
+const autoUsername  = urlParams.get('username');
+const isAutoJoin = !!(autoChannelId && autoUsername);
+
+const orb         = document.getElementById('orb');
+const statusEl    = document.getElementById('status');
+const logsEl      = document.getElementById('logs');
+const connectBtn  = document.getElementById('connect-btn');
+const disconnectBtn = document.getElementById('disconnect-btn');
+const clearBtn    = document.getElementById('clear-btn');
+
+let ws = null;
+let audioCtx = null;
+let micStream = null;
+let micProcessor = null;
+let nextPlayTime = 0;
+let isSpeaking = false;
+let pendingAudioChunks = [];
+let isConnected = false;
+let transcriptBuffer = '';
+
+// ── Logging ──
+function log(tag, msg) {
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-tag ${tag}">${tag}</span><span class="log-body">${msg}</span>`;
+  logsEl.appendChild(el);
+  logsEl.scrollTop = logsEl.scrollHeight;
+}
+
+function setStatus(text) { statusEl.textContent = text; }
+function setOrb(state) {
+  orb.className = 'orb';
+  if (state) orb.classList.add(state);
+}
+
+clearBtn.addEventListener('click', () => { logsEl.innerHTML = ''; });
+
+// ── Connect ──
+connectBtn.addEventListener('click', async () => {
+  if (isConnected) return;
+  connectBtn.disabled = true;
+  setOrb('connecting');
+  setStatus('Obtaining session token…');
+  log('ws', 'Requesting ephemeral token from <b>/api/session</b>…');
+
+  // Create AudioContext NOW during the user gesture so browsers never suspend it
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+  }
+  await audioCtx.resume();
+
+  try {
+    const res = await fetch('/api/session', { method: 'POST' });
+    if (!res.ok) throw new Error(`Session token failed: ${res.status}`);
+    const data = await res.json();
+    const token = data.client_secret?.value || data.value || data.secret || data.token;
+    if (!token) throw new Error('No token in response');
+
+    log('ws', 'Token received. Connecting to xAI Realtime…');
+    setStatus('Connecting to xAI…');
+
+    ws = new WebSocket('wss://api.x.ai/v1/realtime?model=grok-3-fast-latest', [
+      `xai-client-secret.${token}`
+    ]);
+
+    ws.onopen = () => {
+      isConnected = true;
+      log('ws', '<b>WebSocket connected</b>');
+      setStatus('Configuring session…');
+      connectBtn.disabled = true;
+      disconnectBtn.disabled = false;
+
+      // Configure session with voice + MCP tools
+      ws.send(JSON.stringify({
+        type: 'session.update',
+        session: {
+          voice: 'tara',
+          instructions:
+            'You are a helpful voice assistant for Test12.net, a voice-first social posting platform. '
+            + 'You have MCP tools for posts and channels. You also have two local tools on the user\'s device: '
+            + 'pick_contact (opens the phone\'s contact list) and send_invite (shares a URL via SMS, WhatsApp, etc). '
+            + 'When you create a private channel, offer to invite someone by first picking a contact, then sending the invite with the channel URL. '
+            + 'Be concise and friendly. Speak in the language the user uses.',
+          turn_detection: { type: 'server_vad' },
+          modalities: ['text', 'audio'],
+          input_audio_transcription: { model: 'grok-2-latest' },
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          tools: [
+            {
+              type: 'mcp',
+              server_label: 'Test12',
+              server_url: MCP_URL,
+              require_approval: 'never'
+            },
+            {
+              type: 'function',
+              name: 'pick_contact',
+              description: 'Open the phone contact list so the user can pick a contact. Returns the contact name and phone number. Only works on mobile devices.',
+              parameters: { type: 'object', properties: {}, required: [] }
+            },
+            {
+              type: 'function',
+              name: 'send_invite',
+              description: 'Send a private channel invite to a contact. Composes a message with two links. Supports SMS (share sheet), email, and WhatsApp.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  phone: { type: 'string', description: 'Phone number to send SMS/WhatsApp to (optional if using email)' },
+                  email: { type: 'string', description: 'Email address to send to (optional if using SMS/WhatsApp)' },
+                  use_whatsapp: { type: 'boolean', description: 'Set to true to explicitly send via WhatsApp' },
+                  channel_id: { type: 'string', description: 'The private channel ID' },
+                  contact_name: { type: 'string', description: 'Name of the contact (for the message)' },
+                  sender_name: { type: 'string', description: 'Name of the person sending the invite' }
+                },
+                required: ['channel_id']
+              }
+            }
+          ],
+          tool_choice: 'auto'
+        }
+      }));
+
+      log('agent', 'Session configured with <b>MCP tools</b> → ' + MCP_URL);
+      setStatus('Starting microphone…');
+      startMicrophone();
+    };
+
+    ws.onmessage = handleServerEvent;
+
+    ws.onerror = (err) => {
+      log('error', 'WebSocket error');
+      console.error('WS error:', err);
+    };
+
+    ws.onclose = (ev) => {
+      log('ws', `WebSocket closed (code ${ev.code})`);
+      cleanup();
+    };
+
+  } catch (err) {
+    log('error', err.message);
+    setStatus('Connection failed');
+    setOrb('');
+    connectBtn.disabled = false;
+  }
+});
+
+// ── Disconnect ──
+disconnectBtn.addEventListener('click', () => {
+  if (ws) ws.close();
+  cleanup();
+});
+
+function cleanup() {
+  isConnected = false;
+  isSpeaking = false;
+  pendingAudioChunks = [];
+  transcriptBuffer = '';
+  stopMicrophone();
+  setOrb('');
+  setStatus('Disconnected');
+  connectBtn.disabled = false;
+  disconnectBtn.disabled = true;
+  ws = null;
+}
+
+// ═══════════════════════════════════════
+//  MCP Tool Discovery
+// ═══════════════════════════════════════
+
+async function fetchMcpTools() {
+  log('tool', 'Fetching available tools from <b>Test12 MCP</b>…');
+  try {
+    // Step 1 — initialize (required by MCP spec)
+    const initRes = await fetch(MCP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: { protocolVersion: '2024-11-05', capabilities: {},
+                  clientInfo: { name: 'voice-agent', version: '1.0' } }
+      })
+    });
+    if (!initRes.ok) throw new Error(`MCP init failed: ${initRes.status}`);
+
+    // Step 2 — list tools
+    const listRes = await fetch(MCP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })
+    });
+    if (!listRes.ok) throw new Error(`MCP tools/list failed: ${listRes.status}`);
+    const listData = await listRes.json();
+    const tools = listData?.result?.tools || [];
+
+    if (tools.length === 0) {
+      log('tool', 'No tools returned from MCP server.');
+      return;
+    }
+
+    // Display each tool in the log
+    const toolNames = tools.map(t => t.name);
+    log('tool', `<b>${tools.length} tools available:</b> ${toolNames.join(', ')}`);
+    tools.forEach(t => {
+      log('tool', `<b>${t.name}</b> — ${t.description || 'no description'}`);
+    });
+
+    // Ask the agent to greet — or auto-join channel if URL params present
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      let promptText;
+      if (isAutoJoin) {
+        promptText = `The user "${autoUsername}" wants to join private channel "${autoChannelId}". `
+          + `Please call the join_private_channel tool with channel_id="${autoChannelId}" and author="${autoUsername}", `
+          + `then greet the user and tell them they've joined the channel. Read any recent messages aloud.`;
+        log('agent', `Auto-joining channel <b>${autoChannelId}</b> as <b>${autoUsername}</b>`);
+      } else {
+        const toolList = tools.map(t => t.name).join(', ');
+        promptText = `You are now connected. The following Test12 MCP tools are available: ${toolList}. Please briefly greet me and summarize in one sentence what you can help me do.`;
+      }
+      ws.send(JSON.stringify({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message', role: 'user',
+          content: [{ type: 'input_text', text: promptText }]
+        }
+      }));
+      ws.send(JSON.stringify({ type: 'response.create' }));
+      setOrb('speaking');
+      setStatus(isAutoJoin ? 'Joining channel…' : 'Agent introducing tools…');
+    }
+  } catch (err) {
+    log('error', 'MCP tool fetch failed: ' + err.message);
+  }
+}
+
+// ═══════════════════════════════════════
+//  Microphone → PCM16 streaming
+// ═══════════════════════════════════════
+
+async function startMicrophone() {
+  try {
+    // audioCtx already created at Connect time — just resume it
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    await audioCtx.resume();
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+    });
+
+    const source = audioCtx.createMediaStreamSource(micStream);
+
+    // Use ScriptProcessor for broad browser compat (AudioWorklet requires HTTPS + module)
+    micProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
+    micProcessor.onaudioprocess = (e) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const float32 = e.inputBuffer.getChannelData(0);
+      const pcm16 = float32ToPcm16(float32);
+      const base64 = arrayBufferToBase64(pcm16.buffer);
+      ws.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: base64 }));
+    };
+
+    source.connect(micProcessor);
+    micProcessor.connect(audioCtx.destination); // Required for ScriptProcessor to fire
+
+    setOrb('listening');
+    setStatus('Listening… speak naturally');
+    log('audio', 'Microphone streaming at <b>24 kHz PCM16</b>');
+  } catch (err) {
+    log('error', 'Mic access denied: ' + err.message);
+    setStatus('Microphone access required');
+  }
+}
+
+function stopMicrophone() {
+  if (micProcessor) { micProcessor.disconnect(); micProcessor = null; }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+}
+
+// ── PCM conversion helpers ──
+function float32ToPcm16(float32) {
+  const pcm16 = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return pcm16;
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function base64ToInt16Array(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Int16Array(bytes.buffer);
+}
+
+// ═══════════════════════════════════════
+//  Audio playback (PCM16 → AudioBuffer)
+// ═══════════════════════════════════════
+
+function playPcm16Chunk(base64) {
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const pcm16 = base64ToInt16Array(base64);
+  const float32 = new Float32Array(pcm16.length);
+  for (let i = 0; i < pcm16.length; i++) {
+    float32[i] = pcm16[i] / (pcm16[i] < 0 ? 0x8000 : 0x7FFF);
+  }
+
+  const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+  buffer.getChannelData(0).set(float32);
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioCtx.destination);
+
+  const now = audioCtx.currentTime;
+  const startAt = Math.max(now, nextPlayTime);
+  source.start(startAt);
+  nextPlayTime = startAt + buffer.duration;
+}
+
+function stopPlayback() {
+  nextPlayTime = 0;
+  isSpeaking = false;
+  setOrb('listening');
+}
+
+// ═══════════════════════════════════════
+//  Server event handler
+// ═══════════════════════════════════════
+
+function handleServerEvent(event) {
+  const msg = JSON.parse(event.data);
+
+  switch (msg.type) {
+    case 'session.created':
+      log('ws', 'Session created — model: <b>' + (msg.session?.model || 'grok') + '</b>');
+      break;
+
+    case 'session.updated':
+      log('ws', 'Session updated ✓');
+      fetchMcpTools();
+      break;
+
+    // ── Speech detection ──
+    case 'input_audio_buffer.speech_started':
+      log('audio', 'User speaking…');
+      setOrb('listening');
+      setStatus('Listening…');
+      // Interrupt playback (barge-in)
+      stopPlayback();
+      break;
+
+    case 'input_audio_buffer.speech_stopped':
+      log('audio', 'User stopped speaking');
+      setStatus('Thinking…');
+      setOrb('connecting');
+      break;
+
+    // ── Transcript ──
+    case 'conversation.item.input_audio_transcription.completed':
+      if (msg.transcript) {
+        log('text', 'You: <b>' + msg.transcript + '</b>');
+      }
+      break;
+
+    case 'response.output_audio_transcript.delta':
+      transcriptBuffer += (msg.delta || '');
+      break;
+
+    case 'response.output_audio_transcript.done':
+      if (transcriptBuffer) {
+        log('agent', 'Agent: <b>' + transcriptBuffer + '</b>');
+        transcriptBuffer = '';
+      }
+      break;
+
+    // ── Audio output ──
+    case 'response.output_audio.delta':
+      if (!isSpeaking) {
+        isSpeaking = true;
+        setOrb('speaking');
+        setStatus('Agent speaking…');
+      }
+      playPcm16Chunk(msg.delta);
+      break;
+
+    case 'response.output_audio.done':
+      // Audio finished — give time for buffered audio to finish
+      const remaining = Math.max(0, nextPlayTime - (audioCtx?.currentTime || 0));
+      setTimeout(() => {
+        isSpeaking = false;
+        setOrb('listening');
+        setStatus('Listening…');
+      }, remaining * 1000 + 200);
+      break;
+
+    // ── Tool calls ──
+    case 'response.function_call_arguments.delta':
+      // Streaming tool call args — accumulate for client-side tools
+      break;
+
+    case 'response.output_item.done':
+      if (msg.item?.type === 'function_call') {
+        const name = msg.item.name || 'unknown';
+        const callId = msg.item.call_id;
+        let rawArgs = msg.item.arguments || '{}';
+        let args = {};
+        try { args = JSON.parse(rawArgs); } catch(_) {}
+        log('tool', `Called: <b>${name}</b>`);
+
+        // Handle client-side function tools
+        if (name === 'pick_contact' || name === 'send_invite') {
+          handleClientTool(name, args, callId);
+        }
+        // MCP tools are handled server-side automatically
+      }
+      break;
+
+    // ── Response lifecycle ──
+    case 'response.created':
+      break;
+
+    case 'response.done':
+      if (msg.response?.status === 'failed') {
+        const errMsg = msg.response?.status_details?.error?.message || 'Unknown error';
+        log('error', 'Response failed: ' + errMsg);
+      }
+      break;
+
+    case 'error':
+      log('error', (msg.error?.message || JSON.stringify(msg.error)) );
+      break;
+
+    default:
+      // Debug: log all unhandled events to see what's arriving
+      log('ws', `Event: <b>${msg.type}</b>`);
+      console.log('Event:', msg.type, msg);
+      break;
+  }
+}
+
+// ═══════════════════════════════════════
+//  Client-side tool handlers
+// ═══════════════════════════════════════
+
+async function handleClientTool(name, args, callId) {
+  let result;
+
+  if (name === 'pick_contact') {
+    result = await pickContact();
+  } else if (name === 'send_invite') {
+    result = await sendInvite(args);
+  } else {
+    result = { error: 'Unknown client tool: ' + name };
+  }
+
+  log('tool', `Result: <b>${JSON.stringify(result)}</b>`);
+
+  // Send function_call_output back to the agent
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'conversation.item.create',
+      item: {
+        type: 'function_call_output',
+        call_id: callId,
+        output: JSON.stringify(result)
+      }
+    }));
+    ws.send(JSON.stringify({ type: 'response.create' }));
+  }
+}
+
+async function pickContact() {
+  // Contact Picker API (Chrome Android 80+)
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    try {
+      const contacts = await navigator.contacts.select(
+        ['name', 'tel'],
+        { multiple: false }
+      );
+      if (contacts && contacts.length > 0) {
+        const c = contacts[0];
+        const name = (c.name && c.name[0]) || 'Unknown';
+        const phone = (c.tel && c.tel[0]) || '';
+        log('tool', `Contact picked: <b>${name}</b> (${phone})`);
+        return { success: true, name, phone };
+      }
+      return { success: false, reason: 'User cancelled contact selection.' };
+    } catch (err) {
+      return { success: false, reason: 'Contact picker error: ' + err.message };
+    }
+  }
+  return { success: false, reason: 'Contact Picker API not available. This feature requires a mobile device (Android Chrome). Ask the user for the phone number instead.' };
+}
+
+async function sendInvite({ phone, email, use_whatsapp, channel_id, contact_name, sender_name }) {
+  const name = contact_name || 'friend';
+  const sender = sender_name || 'Someone';
+  // Ensure no whitespace in channel ID
+  const cleanChannelId = String(channel_id).trim();
+  const standardUrl = `https://test12.net/private/${cleanChannelId}`;
+  const voiceUrl = `https://test12.net/voice-agent.html?private_channel_id=${cleanChannelId}&username=${encodeURIComponent(name)}`;
+
+  const textBody = `Hey ${name}! ${sender} invited you to a private voice channel on Test12.\n\n`
+    + `🔗 Open in browser:\n${standardUrl}\n\n`
+    + `🎤 Open with Voice Agent:\n${voiceUrl}`;
+
+  // ── Email ──
+  if (email) {
+    const subject = encodeURIComponent(`${sender} invited you to a Test12 voice channel`);
+    const body = encodeURIComponent(textBody);
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    log('tool', `Opened email to <b>${email}</b>`);
+    return { success: true, method: 'email', email, standardUrl, voiceUrl };
+  }
+
+  // ── WhatsApp ──
+  if (phone && use_whatsapp) {
+    const waPhone = phone.replace(/[^0-9]/g, '');
+    const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(textBody)}`;
+    window.location.href = waUrl;
+    log('tool', `Opened WhatsApp to <b>${phone}</b>`);
+    return { success: true, method: 'whatsapp', phone, standardUrl, voiceUrl };
+  }
+
+  // ── SMS / Share ──
+  if (navigator.share && !phone) {
+    try {
+      await navigator.share({ title: 'Join my Test12 channel', text: textBody });
+      log('tool', `Shared invite via native share sheet`);
+      return { success: true, method: 'share_sheet', standardUrl, voiceUrl };
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        return { success: false, reason: 'User cancelled sharing.' };
+      }
+    }
+  }
+
+  if (phone) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const sep = isIOS ? '&' : '?';
+    const smsUrl = `sms:${phone}${sep}body=${encodeURIComponent(textBody)}`;
+    window.location.href = smsUrl;
+    log('tool', `Opened SMS to <b>${phone}</b>`);
+    return { success: true, method: 'sms', phone, standardUrl, voiceUrl };
+  }
+
+  return { success: false, reason: 'No phone or email provided.' };
+}
+
+// ── Auto-connect if URL params are present ──
+if (isAutoJoin) {
+  log('agent', `Auto-join mode: channel=<b>${autoChannelId}</b>, user=<b>${autoUsername}</b>`);
+  setStatus('Auto-connecting…');
+  // Small delay to let the page render
+  setTimeout(() => connectBtn.click(), 500);
+}
+
+</script>
+</body>
+</html>

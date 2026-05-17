@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test12 — Voice Agent (LLM)</title>
+  <meta name="description" content="Test12 voice agent with AI assistant — speak naturally to post and manage channels.">
+</head>
+<body>
+  <script>
+    // Set LLM mode flag — index.html reads this to activate Grok-backed dispatching
+    sessionStorage.setItem('test12_mode', 'llm');
+    // Forward all query params (private_channel_id, username, etc.) to the main app
+    const params = window.location.search;
+    window.location.replace('/' + params);
+  </script>
+  <p style="font-family:sans-serif;padding:2rem">Loading voice agent…</p>
+</body>
+</html>

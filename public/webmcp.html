@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="webmcp" content="true">
+  <title>Test12 — Voice Posts</title>
+</head>
+<body>
+  <!-- Minimal WebMCP manifest page — only tool registrations, no UI -->
+  <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+  <script>
+    window.__webmcp_tools = [];
+
+    function registerWebMCPTool(toolDef) {
+      window.__webmcp_tools.push(toolDef);
+      if (navigator.modelContext && navigator.modelContext.registerTool) {
+        navigator.modelContext.registerTool(toolDef);
+      }
+    }
+
+    registerWebMCPTool({
+      name: 'postVoiceMessage',
+      description: 'Post a new voice message to the public feed. You must provide both your name and the message.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          author: { type: 'string', description: 'Your display name', maxLength: 120 },
+          text:   { type: 'string', description: 'The message to post', maxLength: 2000 }
+        },
+        required: ['author', 'text']
+      },
+      execute: async ({ author, text }) => {
+        const res = await fetch('/api/voice-posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ author, text })
+        });
+        return await res.json();
+      }
+    });
+
+    registerWebMCPTool({
+      name: 'readVoicePosts',
+      description: 'Read all voice posts from the public feed. Returns the latest posts with author, message, and date.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'Maximum number of posts to return (default 50, max 200)' }
+        }
+      },
+      execute: async ({ limit = 50 }) => {
+        const res = await fetch(`/api/voice-posts?limit=${limit}`);
+        return await res.json();
+      }
+    });
+
+    registerWebMCPTool({
+      name: 'refreshPage',
+      description: 'Refresh the website to see the latest content. Use this when the user asks to reload or refresh.',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => {
+        return { success: true, message: 'Page refreshed' };
+      }
+    });
+
+    registerWebMCPTool({
+      name: 'create_private_channel',
+      description: 'Create a new private voice-chat channel. Max 2 users. Returns channel info and a shareable URL.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          author: { type: 'string', description: 'Your display name', maxLength: 120 },
+          name:   { type: 'string', description: 'Channel name (default "Private Chat")', maxLength: 200 }
+        },
+        required: ['author']
+      },
+      execute: async ({ author, name }) => {
+        const res = await fetch('/api/channels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ author, name: name || 'Private Chat' })
+        });
+        return await res.json();
+      }
+    });
+
+    registerWebMCPTool({
+      name: 'join_private_channel',
+      description: 'Join an existing private channel by its ID. Returns channel info, connected users, and recent messages.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          channel_id: { type: 'string', description: 'Channel ID to join' },
+          author:     { type: 'string', description: 'Your display name', maxLength: 120 }
+        },
+        required: ['channel_id', 'author']
+      },
+      execute: async ({ channel_id, author }) => {
+        const res = await fetch(`/api/channels/${channel_id}`);
+        const data = await res.json();
+        return { ...data, joined_as: author };
+      }
+    });
+
+    registerWebMCPTool({
+      name: 'send_channel_message',
+      description: 'Send a text message to a private chat channel. The message is stored and broadcast in real time.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          channel_id: { type: 'string', description: 'Channel ID' },
+          author:     { type: 'string', description: 'Your display name', maxLength: 120 },
+          text:       { type: 'string', description: 'Message text', maxLength: 2000 }
+        },
+        required: ['channel_id', 'author', 'text']
+      },
+      execute: async ({ channel_id, author, text }) => {
+        const res = await fetch(`/api/channels/${channel_id}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ author, text })
+        });
+        return await res.json();
+      }
+    });
+
+    console.log('[WebMCP] 6 tools registered');
+  </script>
+</body>
+</html>
