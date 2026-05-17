@@ -1020,11 +1020,20 @@ function onLoggedIn() {
   // Save USERID to datalist history
   if (currentUser.displayName) saveUidToHistory(currentUser.displayName);
   speak(`Welcome, ${currentUser.displayName || 'there'}! Your public username is ${currentUser.displayName}.`);
-  // Fetch full profile (includes plan tier)
+  // Fetch full profile (includes plan tier and deluxeType)
   fetch('/api/auth/me', { headers: authHeaders() })
     .then(r => r.ok ? r.json() : null)
-    .then(u => { if (u) setCurrentPlan(u.plan || 'standard'); })
-    .catch(() => setCurrentPlan('standard'));
+    .then(u => {
+      if (u) {
+        setCurrentPlan(u.plan || 'standard');
+        if (u.deluxeType) {
+          currentDeluxeType = u.deluxeType;
+          localStorage.setItem('deluxeType', u.deluxeType);
+        }
+        refreshVAMode();
+      }
+    })
+    .catch(() => { setCurrentPlan('standard'); refreshVAMode(); });
   // Save channel from URL invite server-side
   if (autoChannelId) {
     fetch(`/api/channels/${autoChannelId}/join`, { method: 'POST', headers: authHeaders() }).catch(() => {});
@@ -1516,18 +1525,25 @@ async function mcpCall(toolName, toolArgs) {
   return text ? JSON.parse(text) : data?.result;
 }
 
-// ── Mode detection: 'llm' = voice-agent.html (Grok), default = WebMCP (no LLM) ──
-// ── Voice agent mode — dynamically determined after login ──
-// 'deluxe' → xAI grok-voice-latest realtime (Deluxe plan only)
-// 'llm'    → Claude Haiku text+tool (Standard plan, high-quality)
-// 'webmcp' → Browser-native STT + direct MCP (Standard plan, no LLM)
-function getVAMode() {
-  const stored = sessionStorage.getItem('test12_mode');
-  if (stored === 'deluxe' && isDeluxe()) return 'deluxe';
-  if (stored === 'llm' || stored === 'deluxe') return 'llm'; // deluxe on standard → downgrade to llm
-  return 'webmcp';
+// ── Voice agent mode ──
+// 'deluxe-xai'    → xAI grok-voice-latest realtime + Grok-3 (3h pass)
+// 'deluxe-claude' → Browser PTT + Claude Sonnet (3h pass)
+// 'deluxe-openai' → OpenAI gpt-realtime-2 streaming (3h pass)
+// 'llm'           → Browser PTT + Claude Haiku (Standard monthly)
+let currentDeluxeType = localStorage.getItem('deluxeType') || 'xai';
+let VA_MODE = 'llm'; // default — updated after login in refreshVAMode()
+
+function refreshVAMode() {
+  if (currentPlan === 'deluxe') {
+    if (currentDeluxeType === 'xai')          VA_MODE = 'deluxe-xai';
+    else if (currentDeluxeType === 'claude-sonnet') VA_MODE = 'deluxe-claude';
+    else if (currentDeluxeType === 'openai')  VA_MODE = 'deluxe-openai';
+    else VA_MODE = 'deluxe-xai';
+  } else {
+    VA_MODE = 'llm'; // Standard: Claude Haiku
+  }
+  updateAgentUI();
 }
-const VA_MODE = getVAMode();
 
 // ── MCP tools schema (shared by both Grok and Claude dispatchers) ──
 const MCP_TOOLS_SCHEMA = [
@@ -1664,8 +1680,8 @@ async function dispatchIntent(transcript) {
   setStatus('Thinking…'); setOrb('connecting');
 
   try {
-    if (VA_MODE === 'llm') {
-      // ── Standard plan: Claude Haiku decides which tool to call ──
+    if (VA_MODE === 'llm' || VA_MODE === 'deluxe-claude') {
+      // Standard: Claude Haiku | Deluxe Claude: Claude Sonnet — both via /api/claude-chat
       await dispatchWithClaude(transcript);
     } else {
       // ── WebMCP mode: free rule-based pattern matching ──
@@ -1723,16 +1739,251 @@ async function dispatchIntent(transcript) {
 //  Mode-aware voice UI initialisation
 // ═══════════════════════════════════════════════════
 
-if (VA_MODE === 'deluxe') {
-  // ── Plan 3: Deluxe — xAI Realtime WebSocket + MCP tools ──
-  let ws = null;
-  let audioCtx = null, micStream = null, micProcessor = null;
-  let nextPlayTime = 0, isSpeaking = false, transcriptBuffer = '';
-  let isConnected = false;
+// ── Shared audio helpers (used by xAI and OpenAI realtime modes) ──
+function float32ToPcm16(f) { const p=new Int16Array(f.length); for(let i=0;i<f.length;i++){const s=Math.max(-1,Math.min(1,f[i]));p[i]=s<0?s*0x8000:s*0x7FFF;} return p; }
+function arrayBufferToBase64(b) { const u=new Uint8Array(b);let s='';for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s); }
+function base64ToInt16Array(b64) { const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return new Int16Array(u.buffer); }
 
-  function float32ToPcm16(f) { const p=new Int16Array(f.length); for(let i=0;i<f.length;i++){const s=Math.max(-1,Math.min(1,f[i]));p[i]=s<0?s*0x8000:s*0x7FFF;} return p; }
-  function arrayBufferToBase64(b) { const u=new Uint8Array(b);let s='';for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s); }
-  function base64ToInt16Array(b64) { const b=atob(b64),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return new Int16Array(u.buffer); }
+// ── updateAgentUI — called after plan/mode is known ──
+function updateAgentUI() {
+  const isRealtime = VA_MODE === 'deluxe-xai' || VA_MODE === 'deluxe-openai';
+  const isPTT = VA_MODE === 'llm' || VA_MODE === 'deluxe-claude';
+
+  if (isRealtime) {
+    const label = VA_MODE === 'deluxe-xai' ? '🌟 Connect (xAI Grok-3)' : '🌟 Connect (OpenAI Realtime)';
+    connectBtn.textContent = label;
+    disconnectBtn.style.display = '';
+    disconnectBtn.disabled = true;
+    setStatus('Click Connect to start');
+    const modeLabel = VA_MODE === 'deluxe-xai' ? 'xAI Grok-3 realtime voice' : 'OpenAI gpt-realtime-2 voice';
+    log('ws', `<b>Deluxe mode</b> — ${modeLabel} with MCP tools`);
+  } else {
+    const label = VA_MODE === 'deluxe-claude' ? '🧠 Tap to Speak (Sonnet)' : '🤖 Tap to Speak (AI)';
+    connectBtn.textContent = label;
+    disconnectBtn.style.display = 'none';
+    setStatus('Tap to speak');
+    const modeLabel = VA_MODE === 'deluxe-claude' ? 'Claude Sonnet 4 + Browser STT/TTS' : 'Claude Haiku + Browser STT/TTS';
+    log('ws', `<b>${VA_MODE === 'deluxe-claude' ? 'Deluxe' : 'Standard'} mode</b> — ${modeLabel}`);
+  }
+}
+
+// ── Realtime WebSocket state (shared by xAI and OpenAI) ──
+{
+  let rtWs = null;
+  let rtAudioCtx = null, rtMicStream = null, rtMicProcessor = null;
+  let rtNextPlayTime = 0, rtIsSpeaking = false, rtTranscriptBuffer = '';
+  let rtIsConnected = false;
+
+  function playPcm16Chunk(b64) {
+    if (!rtAudioCtx) return;
+    if (rtAudioCtx.state === 'suspended') rtAudioCtx.resume();
+    const pcm = base64ToInt16Array(b64);
+    const f32 = new Float32Array(pcm.length);
+    for (let i=0;i<pcm.length;i++) f32[i]=pcm[i]/(pcm[i]<0?0x8000:0x7FFF);
+    const buf = rtAudioCtx.createBuffer(1, f32.length, 24000);
+    buf.getChannelData(0).set(f32);
+    const src = rtAudioCtx.createBufferSource(); src.buffer=buf; src.connect(rtAudioCtx.destination);
+    const now = rtAudioCtx.currentTime, startAt = Math.max(now, rtNextPlayTime);
+    src.start(startAt); rtNextPlayTime = startAt + buf.duration;
+  }
+
+  async function rtStartMicrophone(wsRef) {
+    if (!rtAudioCtx) rtAudioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
+    await rtAudioCtx.resume();
+    rtMicStream = await navigator.mediaDevices.getUserMedia({audio:{sampleRate:24000,channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    const src = rtAudioCtx.createMediaStreamSource(rtMicStream);
+    rtMicProcessor = rtAudioCtx.createScriptProcessor(4096,1,1);
+    rtMicProcessor.onaudioprocess = (e) => {
+      if (!wsRef()||wsRef().readyState!==WebSocket.OPEN) return;
+      const b64 = arrayBufferToBase64(float32ToPcm16(e.inputBuffer.getChannelData(0)).buffer);
+      wsRef().send(JSON.stringify({type:'input_audio_buffer.append',audio:b64}));
+    };
+    src.connect(rtMicProcessor); rtMicProcessor.connect(rtAudioCtx.destination);
+    setOrb('listening'); setStatus('Listening… speak naturally');
+  }
+
+  function rtStopMicrophone() {
+    if (rtMicProcessor){rtMicProcessor.disconnect();rtMicProcessor=null;}
+    if (rtMicStream){rtMicStream.getTracks().forEach(t=>t.stop());rtMicStream=null;}
+    if (rtAudioCtx){rtAudioCtx.close().catch(()=>{});rtAudioCtx=null;}
+  }
+
+  function rtCleanup() {
+    rtIsConnected=false; rtIsSpeaking=false; rtTranscriptBuffer='';
+    rtStopMicrophone(); setOrb(''); setStatus('Disconnected');
+    connectBtn.disabled=false; disconnectBtn.disabled=true; rtWs=null;
+  }
+
+  function handleRealtimeEvent(ev) {
+    const msg = JSON.parse(ev.data);
+    switch (msg.type) {
+      case 'session.created': log('ws','Session created — model: <b>'+(msg.session?.model||'?')+'</b>'); break;
+      case 'mcp_list_tools.completed': log('ws','MCP tools loaded ✓'); rtGreet(); break;
+      case 'input_audio_buffer.speech_started': setOrb('listening'); setStatus('Listening…'); rtNextPlayTime=0; rtIsSpeaking=false; break;
+      case 'input_audio_buffer.speech_stopped': setStatus('Thinking…'); setOrb('connecting'); break;
+      case 'conversation.item.input_audio_transcription.completed': if(msg.transcript) log('text','You: <b>'+msg.transcript+'</b>'); break;
+      case 'response.output_audio_transcript.delta': rtTranscriptBuffer+=(msg.delta||''); break;
+      case 'response.output_audio_transcript.done': if(rtTranscriptBuffer){log('agent','Agent: <b>'+rtTranscriptBuffer+'</b>');rtTranscriptBuffer='';} break;
+      case 'response.output_audio.delta':
+        if (!rtIsSpeaking){rtIsSpeaking=true;setOrb('speaking');setStatus('Agent speaking…');}
+        playPcm16Chunk(msg.delta); break;
+      case 'response.audio.delta': // OpenAI format
+        if (!rtIsSpeaking){rtIsSpeaking=true;setOrb('speaking');setStatus('Agent speaking…');}
+        playPcm16Chunk(msg.delta); break;
+      case 'response.output_audio.done':
+      case 'response.audio.done': {
+        const rem=Math.max(0,rtNextPlayTime-(rtAudioCtx?.currentTime||0));
+        setTimeout(()=>{rtIsSpeaking=false;setOrb('listening');setStatus('Listening…');},rem*1000+200); break;
+      }
+      case 'response.output_item.done':
+        if (msg.item?.type==='function_call') {
+          const {name,call_id,arguments:rawArgs}=msg.item;
+          let args={}; try{args=JSON.parse(rawArgs||'{}');}catch(_){}
+          log('tool',`Called: <b>${name}</b>`);
+          if (['pick_contact','send_invite','set_alias','remove_alias'].includes(name)) handleClientTool(name,args,call_id,rtWs);
+        } break;
+      case 'response.mcp_call.completed': {
+        const tn=msg.mcp_call?.name||'';
+        const out=(()=>{try{return JSON.parse(msg.mcp_call?.output||'{}');}catch(_){return{};}})();
+        if (tn==='list_posts'||tn==='create_post'){setActiveChannel('public');loadPublicPosts();}
+        if (['read_channel_messages','send_channel_message','join_private_channel','create_private_channel'].includes(tn)){
+          const cid=out.channel?.id||out.channel_id||out.id;
+          if(cid){addMyChannelId(cid);setActiveChannel(cid);}
+          loadPrivateChannels();
+        } break;
+      }
+      case 'error': log('error',msg.error?.message||JSON.stringify(msg.error)); break;
+    }
+  }
+
+  function rtGreet() {
+    if (!rtWs||rtWs.readyState!==WebSocket.OPEN) return;
+    const promptText = isAutoJoin
+      ? `The user "${autoUsername}" wants to join private channel "${autoChannelId}". Call join_private_channel then greet them and read recent messages aloud.`
+      : `You are now connected with full MCP access. Briefly greet the user and summarise what you can help with in one sentence.`;
+    rtWs.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:promptText}]}}));
+    rtWs.send(JSON.stringify({type:'response.create',response:{modalities:['text','audio']}}));
+    setOrb('speaking'); setStatus(isAutoJoin?'Joining channel…':'Agent greeting…');
+  }
+
+  // ── Connect button — handles both xAI and OpenAI realtime ──
+  connectBtn.addEventListener('click', async () => {
+    if (rtIsConnected) return;
+    if (VA_MODE !== 'deluxe-xai' && VA_MODE !== 'deluxe-openai') return; // PTT modes handled below
+    connectBtn.disabled = true; setOrb('connecting'); setStatus('Obtaining session token…');
+    if (!rtAudioCtx) rtAudioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
+    await rtAudioCtx.resume();
+    try {
+      const endpoint = VA_MODE === 'deluxe-xai' ? '/api/session' : '/api/openai-session';
+      const res = await fetch(endpoint, {method:'POST', headers: authHeaders()});
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({}));
+        if (res.status === 402) {
+          log('error', '⏱️ Deluxe pass expired. <a href="/upgrade">Buy another 3-hour pass →</a>');
+          setStatus('Pass expired'); connectBtn.disabled=false; return;
+        }
+        throw new Error(err.message || `Session token failed: ${res.status}`);
+      }
+      const data = await res.json();
+      const token = data.client_secret?.value || data.value || data.secret || data.token;
+      if (!token) throw new Error('No token in response');
+
+      let wsUrl, wsProtocols;
+      if (VA_MODE === 'deluxe-xai') {
+        wsUrl = 'wss://api.x.ai/v1/realtime?model=grok-voice-latest';
+        wsProtocols = [`xai-client-secret.${token}`];
+        log('ws','Connecting to <b>xAI Grok-3 Realtime</b>…');
+      } else {
+        wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-realtime-2`;
+        wsProtocols = ['realtime', `openai-insecure-api-key.${token}`, 'openai-beta.realtime-v1'];
+        log('ws','Connecting to <b>OpenAI gpt-realtime-2</b>…');
+      }
+
+      rtWs = new WebSocket(wsUrl, wsProtocols);
+      rtWs.onopen = () => {
+        rtIsConnected=true; log('ws','<b>WebSocket connected</b>'); setStatus('Configuring session…');
+        connectBtn.disabled=true; disconnectBtn.disabled=false;
+        // Session config differs slightly between providers
+        if (VA_MODE === 'deluxe-xai') {
+          rtWs.send(JSON.stringify({type:'session.update',session:{
+            voice:'ara', model:'grok-3',
+            instructions: 'You are a helpful voice assistant for Test12, a voice-first social platform. Be concise and action-oriented. Use MCP tools for posts and channels. Current user: '+(currentUser?.displayName||'unknown')+'. Speak in the user\'s language.',
+            turn_detection:{type:'server_vad'},
+            modalities:['text','audio'],
+            input_audio_transcription:{model:'grok-2-latest'},
+            input_audio_format:'pcm16', output_audio_format:'pcm16',
+            tools:[
+              {type:'mcp',server_label:'Test12',server_url:MCP_URL,require_approval:'never'},
+              {type:'function',name:'pick_contact',description:'Open phone contact picker.',parameters:{type:'object',properties:{},required:[]}},
+              {type:'function',name:'send_invite',description:'Send a private channel invite.',parameters:{type:'object',properties:{phone:{type:'string'},email:{type:'string'},use_whatsapp:{type:'boolean'},channel_id:{type:'string'},contact_name:{type:'string'},sender_name:{type:'string'}},required:['channel_id']}},
+              {type:'function',name:'set_alias',description:'Remember a nickname for a username.',parameters:{type:'object',properties:{username:{type:'string'},alias:{type:'string'}},required:['username','alias']}},
+              {type:'function',name:'remove_alias',description:'Remove a personal alias.',parameters:{type:'object',properties:{username:{type:'string'}},required:['username']}}
+            ],
+            tool_choice:'auto'
+          }}));
+        } else {
+          // OpenAI realtime session config
+          rtWs.send(JSON.stringify({type:'session.update',session:{
+            voice:'alloy',
+            instructions: 'You are a helpful voice assistant for Test12, a voice-first social platform. Be concise. Current user: '+(currentUser?.displayName||'unknown')+'. Speak in the user\'s language.',
+            turn_detection:{type:'server_vad'},
+            modalities:['text','audio'],
+            input_audio_transcription:{model:'whisper-1'},
+            input_audio_format:'pcm16', output_audio_format:'pcm16',
+            tools:[
+              {type:'function',name:'list_posts',description:'List recent public posts.',parameters:{type:'object',properties:{limit:{type:'number'}},required:[]}},
+              {type:'function',name:'create_post',description:'Create a public post.',parameters:{type:'object',properties:{text:{type:'string'},author:{type:'string'}},required:['text','author']}},
+              {type:'function',name:'send_invite',description:'Send a channel invite.',parameters:{type:'object',properties:{phone:{type:'string'},email:{type:'string'},channel_id:{type:'string'},contact_name:{type:'string'},sender_name:{type:'string'}},required:['channel_id']}}
+            ],
+            tool_choice:'auto'
+          }}));
+          // Greet immediately (OpenAI doesn't fire mcp_list_tools)
+          setTimeout(() => rtGreet(), 500);
+        }
+        log('agent','Session configured → '+MCP_URL);
+        rtStartMicrophone(() => rtWs);
+      };
+      rtWs.onmessage = handleRealtimeEvent;
+      rtWs.onerror = (err) => { log('error','WebSocket error'); console.error(err); };
+      rtWs.onclose = (ev) => {
+        log('ws',`WebSocket closed (${ev.code})`);
+        const unexpected = rtIsConnected && ev.code!==1000;
+        rtCleanup();
+        if (unexpected && (ev.code===1005||ev.code===1006)) {
+          log('ws','Session timed out — reconnecting in 2s…'); setStatus('Reconnecting…');
+          connectBtn.disabled=true; setTimeout(()=>{ if(!rtIsConnected) connectBtn.click(); },2000);
+        }
+      };
+    } catch (err) { log('error',err.message); setStatus('Connection failed'); setOrb(''); connectBtn.disabled=false; }
+  });
+
+  disconnectBtn.addEventListener('click', () => { if(rtWs) rtWs.close(); rtCleanup(); });
+
+  // ── PTT click — handles Standard (Haiku) and Deluxe Claude (Sonnet) ──
+  connectBtn.addEventListener('click', () => {
+    if (VA_MODE !== 'llm' && VA_MODE !== 'deluxe-claude') return;
+    if (ptListening) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { ptSpeak('Speech recognition not supported. Use Chrome.'); log('error','SpeechRecognition not supported.'); return; }
+    ptRecognizer = new SR();
+    ptRecognizer.lang = navigator.language || 'en-US';
+    ptRecognizer.interimResults = false; ptRecognizer.maxAlternatives = 1;
+    ptRecognizer.onstart = () => {
+      ptListening=true; setOrb('listening'); setStatus('Listening…');
+      connectBtn.textContent='🔴 Listening…'; connectBtn.disabled=true;
+    };
+    ptRecognizer.onresult = (e) => { const t=e.results[0][0].transcript.trim(); if(t) dispatchIntent(t); };
+    ptRecognizer.onerror = (e) => { log('error','STT error: '+e.error); setStatus('Tap to speak'); };
+    ptRecognizer.onend = () => {
+      ptListening=false; setOrb(''); setStatus('Tap to speak');
+      updateAgentUI(); connectBtn.disabled=false;
+    };
+    ptRecognizer.start();
+  });
+
+  // Initialise UI once DOM is ready (mode set after login via refreshVAMode)
+  updateAgentUI();
+}
 
   function playPcm16Chunk(b64) {
     if (!audioCtx) return;

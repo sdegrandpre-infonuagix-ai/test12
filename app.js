@@ -12,6 +12,7 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -38,12 +39,11 @@ async function requireDeluxe(req, res, next) {
       if (session) {
         const user = await db.getUserById(session.phone).catch(() => null);
         if (user?.plan === 'deluxe') {
-          // Check 3-hour expiry for one-time purchases
           if (!user.deluxeExpiresAt || new Date(user.deluxeExpiresAt) > new Date()) {
             req.user = session;
+            req.deluxeType = user.deluxeType || 'xai';
             return next();
           }
-          // Expired — downgrade silently
           await db.setUserPlan(session.phone, 'standard', null).catch(() => {});
         }
       }
@@ -52,7 +52,7 @@ async function requireDeluxe(req, res, next) {
   return res.status(402).json({
     error: 'Deluxe access required',
     upgrade_url: '/upgrade',
-    message: 'Purchase 3 hours of Deluxe access at test12.net/upgrade.',
+    message: 'Purchase a 3-hour Deluxe pass at test12.net/upgrade.',
   });
 }
 
@@ -818,7 +818,15 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
     const user = await db.getUserById(req.user.phone);
-    res.json({ phone: user?.phone || req.user.phone, displayName: user?.displayName || '', plan: user?.plan || 'standard' });
+    const isActiveDeluxe = user?.plan === 'deluxe' &&
+      (!user.deluxeExpiresAt || new Date(user.deluxeExpiresAt) > new Date());
+    res.json({
+      phone: user?.phone || req.user.phone,
+      displayName: user?.displayName || '',
+      plan: isActiveDeluxe ? 'deluxe' : 'standard',
+      deluxeType: isActiveDeluxe ? (user.deluxeType || 'xai') : null,
+      deluxeExpiresAt: isActiveDeluxe ? user.deluxeExpiresAt : null,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -956,8 +964,11 @@ app.get('/api/channels/:id/messages', async (req, res) => {
   }
 });
 
-// POST /api/session — get xAI ephemeral token for Voice Agent API (Deluxe only)
+// POST /api/session — xAI ephemeral token (Deluxe xAI only)
 app.post('/api/session', requireDeluxe, async (req, res) => {
+  if (req.deluxeType && req.deluxeType !== 'xai') {
+    return res.status(403).json({ error: 'This endpoint is for xAI Deluxe only.' });
+  }
   try {
     const r = await fetch('https://api.x.ai/v1/realtime/client_secrets', {
       method: 'POST',
@@ -975,8 +986,31 @@ app.post('/api/session', requireDeluxe, async (req, res) => {
     res.status(500).json({ error: 'Failed to get session token', details: err.message });
   }
 });
+// POST /api/openai-session — OpenAI realtime ephemeral token (Deluxe OpenAI only)
+app.post('/api/openai-session', requireDeluxe, async (req, res) => {
+  if (req.deluxeType && req.deluxeType !== 'openai') {
+    return res.status(403).json({ error: 'This endpoint is for OpenAI Deluxe only.' });
+  }
+  if (!OPENAI_API_KEY) return res.status(503).json({ error: 'OpenAI API not configured' });
+  try {
+    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: 'gpt-realtime-2', voice: 'alloy' }),
+    });
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json(data);
+    res.json(data);
+  } catch (err) {
+    console.error('OpenAI session token error:', err);
+    res.status(500).json({ error: 'Failed to get OpenAI session token', details: err.message });
+  }
+});
 
-// Serve private channels landing page
+
 app.get('/private', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'private.html'));
 });
@@ -1008,6 +1042,13 @@ app.post('/api/claude-chat', requireAuth, async (req, res) => {
   if (!transcript) return res.status(400).json({ error: 'transcript required' });
   const userId = req.user.phone;
 
+  // Select model: Sonnet for active deluxe-claude users, Haiku for everyone else
+  const user = await db.getUserById(userId).catch(() => null);
+  const isDeluxeClaude = user?.plan === 'deluxe' &&
+    user?.deluxeType === 'claude-sonnet' &&
+    (!user.deluxeExpiresAt || new Date(user.deluxeExpiresAt) > new Date());
+  const model = isDeluxeClaude ? 'claude-sonnet-4-5' : CLAUDE_MODEL;
+  if (isDeluxeClaude) console.log(`Claude-chat: using Sonnet for deluxe user ${userId}`);
   // Build Anthropic tools array from MCP schema
   const anthropicTools = tools.map(t => ({
     name: t.name,
@@ -1030,7 +1071,7 @@ app.post('/api/claude-chat', requireAuth, async (req, res) => {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: CLAUDE_MODEL,
+      model,
       max_tokens: 512,
       system: systemPrompt || TEST12_SYSTEM_PROMPT,
       tools: anthropicTools.length ? anthropicTools : undefined,
@@ -1073,7 +1114,7 @@ app.post('/api/claude-chat', requireAuth, async (req, res) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: CLAUDE_MODEL,
+        model,
         max_tokens: 256,
         system: systemPrompt || TEST12_SYSTEM_PROMPT,
         messages,
@@ -1125,14 +1166,20 @@ app.get('/api/billing/status', requireAuth, async (req, res) => {
 // ──────────────────────────────────────────────
 const DELUXE_DURATION_HOURS = 3;
 
+const DELUXE_PRICE_IDS = {
+  'xai':          process.env.STRIPE_DELUXE_XAI_PRICE_ID,
+  'claude-sonnet': process.env.STRIPE_DELUXE_CLAUDE_PRICE_ID,
+  'openai':       process.env.STRIPE_DELUXE_OPENAI_PRICE_ID,
+};
+
 app.post('/api/billing/create-checkout', requireAuth, async (req, res) => {
   if (!STRIPE_SECRET_KEY) return res.status(503).json({ error: 'Stripe not configured' });
+  const { type = 'xai' } = req.body || {};
+  if (!DELUXE_PRICE_IDS[type]) return res.status(400).json({ error: `Unknown deluxe type: ${type}` });
   try {
     const stripe = require('stripe')(STRIPE_SECRET_KEY);
     const user = await db.getUserById(req.user.phone);
     const baseUrl = process.env.BASE_URL || 'https://test12.net';
-
-    // Get or create Stripe customer
     let customerId = user?.stripeCustomerId;
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -1141,20 +1188,15 @@ app.post('/api/billing/create-checkout', requireAuth, async (req, res) => {
       customerId = customer.id;
       await db.setStripeCustomerId(req.user.phone, customerId);
     }
-
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: 'payment',                          // one-time, not subscription
+      mode: 'payment',
       payment_method_types: ['card'],
-      line_items: [{
-        price: process.env.STRIPE_DELUXE_PRICE_ID,
-        quantity: 1,
-      }],
-      success_url: `${baseUrl}/?upgraded=1`,
+      line_items: [{ price: DELUXE_PRICE_IDS[type], quantity: 1 }],
+      success_url: `${baseUrl}/?upgraded=1&type=${type}`,
       cancel_url:  `${baseUrl}/upgrade`,
-      metadata: { userId: req.user.phone },
+      metadata: { userId: req.user.phone, deluxeType: type },
     });
-
     res.json({ url: session.url });
   } catch (err) {
     console.error('Stripe checkout error:', err);
@@ -1185,10 +1227,11 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
       // Only handle successful payments (not subscriptions)
       if (session.payment_status === 'paid' && session.mode === 'payment') {
         const userId = session.metadata?.userId;
+        const deluxeType = session.metadata?.deluxeType || 'xai';
         if (userId) {
           const expiresAt = new Date(Date.now() + DELUXE_DURATION_HOURS * 60 * 60 * 1000).toISOString();
-          await db.setUserPlan(userId, 'deluxe', null, expiresAt);
-          console.log(`Stripe: user ${userId} → Deluxe for ${DELUXE_DURATION_HOURS}h (expires ${expiresAt})`);
+          await db.setUserPlan(userId, 'deluxe', null, expiresAt, deluxeType);
+          console.log(`Stripe: user ${userId} → Deluxe[${deluxeType}] for ${DELUXE_DURATION_HOURS}h (expires ${expiresAt})`);
         }
       }
     }
