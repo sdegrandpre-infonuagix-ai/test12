@@ -11,7 +11,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Test12">
   <link rel="manifest" href="/manifest.json">
+  <!-- Apple PWA icons (required for iOS Safari home screen) -->
   <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icon-192.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,6 +25,7 @@
       background: #050810;
       color: #e2e8f0;
       min-height: 100vh;
+      min-height: -webkit-fill-available; /* iOS Safari viewport fix */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -63,6 +68,7 @@
       max-width: 640px;
       margin: 1rem 1.5rem;
       background: rgba(15, 23, 42, 0.7);
+      -webkit-backdrop-filter: blur(24px);
       backdrop-filter: blur(24px);
       border: 1px solid rgba(148, 163, 184, 0.1);
       border-radius: 20px;
@@ -177,6 +183,7 @@
       max-width: 640px;
       margin: 0 1.5rem 2rem;
       background: rgba(15, 23, 42, 0.5);
+      -webkit-backdrop-filter: blur(16px);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(148, 163, 184, 0.08);
       border-radius: 16px;
@@ -242,7 +249,7 @@
       letter-spacing: 0.08em; color: #64748b; margin-bottom: 0.5rem;
     }
     .channel-panel {
-      background: rgba(15,23,42,0.6); backdrop-filter: blur(16px);
+      background: rgba(15,23,42,0.6); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
       border: 2px solid rgba(21, 149, 178,0.35); border-radius: 14px;
       padding: 1rem 1.25rem; margin-bottom: 0.75rem;
       cursor: pointer; transition: border-color 0.25s, box-shadow 0.25s, transform 0.15s;
@@ -293,6 +300,7 @@
     #login-overlay {
       position: fixed; inset: 0; z-index: 9999;
       background: rgba(5,8,16,0.92);
+      -webkit-backdrop-filter: blur(12px);
       backdrop-filter: blur(12px);
       display: flex; align-items: center; justify-content: center;
       transition: opacity 0.3s;
@@ -757,7 +765,16 @@ function speak(text) {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US'; u.rate = 1.05; u.pitch = 1;
-  window.speechSynthesis.speak(u);
+  // Safari loads voices asynchronously — wait for them if not ready yet
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    window.speechSynthesis.speak(u);
+  } else {
+    window.speechSynthesis.addEventListener('voiceschanged', function once() {
+      window.speechSynthesis.removeEventListener('voiceschanged', once);
+      window.speechSynthesis.speak(u);
+    });
+  }
 }
 
 // ── Login Modal logic ──
@@ -1492,11 +1509,19 @@ let ptRecognizer = null;
 let ptListening = false;
 
 function ptSpeak(text) {
-  if (!text) return;
+  if (!text || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US'; u.rate = 1.05; u.pitch = 1;
-  window.speechSynthesis.speak(u);
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    window.speechSynthesis.speak(u);
+  } else {
+    window.speechSynthesis.addEventListener('voiceschanged', function once() {
+      window.speechSynthesis.removeEventListener('voiceschanged', once);
+      window.speechSynthesis.speak(u);
+    });
+  }
 }
 
 function setStatus(text) { statusEl.textContent = text; }
@@ -1790,7 +1815,8 @@ function updateAgentUI() {
   async function rtStartMicrophone(wsRef) {
     if (!rtAudioCtx) rtAudioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
     await rtAudioCtx.resume();
-    rtMicStream = await navigator.mediaDevices.getUserMedia({audio:{sampleRate:24000,channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    // sampleRate constraint omitted: Safari throws OverconstrainedError if unsupported
+    rtMicStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
     const src = rtAudioCtx.createMediaStreamSource(rtMicStream);
     rtMicProcessor = rtAudioCtx.createScriptProcessor(4096,1,1);
     rtMicProcessor.onaudioprocess = (e) => {
@@ -2003,7 +2029,8 @@ function updateAgentUI() {
   async function startMicrophone() {
     if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
     await audioCtx.resume();
-    micStream = await navigator.mediaDevices.getUserMedia({audio:{sampleRate:24000,channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    // sampleRate constraint omitted: Safari throws OverconstrainedError if unsupported
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
     const src = audioCtx.createMediaStreamSource(micStream);
     micProcessor = audioCtx.createScriptProcessor(4096,1,1);
     micProcessor.onaudioprocess = (e) => {
