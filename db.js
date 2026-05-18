@@ -64,6 +64,24 @@ function initSqlite() {
       user_id TEXT NOT NULL, username TEXT NOT NULL, alias TEXT NOT NULL,
       updated_at TEXT NOT NULL, PRIMARY KEY (user_id, username)
     );
+    CREATE TABLE IF NOT EXISTS addon_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      addon_type TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      duration_secs REAL
+    );
+    CREATE INDEX IF NOT EXISTS idx_addon_sessions_user ON addon_sessions(user_id, addon_type);
+    CREATE TABLE IF NOT EXISTS addon_purchases (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      addon_type TEXT NOT NULL,
+      minutes_added INTEGER NOT NULL DEFAULT 180,
+      purchased_at TEXT NOT NULL,
+      stripe_session_id TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_addon_purchases_user ON addon_purchases(user_id, addon_type);
   `);
   console.log('SQLite: using local.db (DynamoDB unavailable)');
 }
@@ -695,6 +713,167 @@ async function getUsageSummary({ userId, from, to } = {}) {
 }
 
 // ══════════════════════════════════════════
+//  Add-on Session Tracking
+//  Records start / end of each voice session per add-on type so we can
+//  compute total minutes consumed from each 3-hour block.
+// ══════════════════════════════════════════
+
+function _addonId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+}
+
+// Record one 3-hour block purchase (called from Stripe webhook)
+async function recordAddonPurchase(userId, addonType, stripeSessionId = null) {
+  const id  = _addonId();
+  const now = new Date().toISOString();
+  if (useSqlite) {
+    sqliteDb.prepare(
+      'INSERT INTO addon_purchases (id,user_id,addon_type,minutes_added,purchased_at,stripe_session_id) VALUES (?,?,?,?,?,?)'
+    ).run(id, userId, addonType, ADDON_BLOCK_MINS, now, stripeSessionId || null);
+    return;
+  }
+  if (!doc) return;
+  await doc.send(new PutCommand({
+    TableName: TABLE,
+    Item: { pk: `ADDON_PURCHASE#${userId}`, sk: `${now}#${id}`, id, userId, addonType, minutesAdded: ADDON_BLOCK_MINS, purchasedAt: now, stripeSessionId },
+  }));
+}
+
+// Total minutes purchased (sum of all blocks bought) — 0 if none bought yet
+async function getAddonPurchasedMins(userId, addonType) {
+  if (useSqlite) {
+    const row = sqliteDb.prepare(
+      'SELECT COALESCE(SUM(minutes_added), 0) AS total FROM addon_purchases WHERE user_id = ? AND addon_type = ?'
+    ).get(userId, addonType);
+    return row?.total || 0;
+  }
+  if (!doc) return 0;
+  const r = await doc.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'pk = :pk',
+    ExpressionAttributeValues: { ':pk': `ADDON_PURCHASE#${userId}` },
+  }));
+  return (r.Items || [])
+    .filter(i => i.addonType === addonType)
+    .reduce((s, i) => s + (i.minutesAdded || ADDON_BLOCK_MINS), 0);
+}
+
+async function startAddonSession(userId, addonType) {
+  const id  = _addonId();
+  const now = new Date().toISOString();
+  if (useSqlite) {
+    sqliteDb.prepare(
+      'INSERT INTO addon_sessions (id,user_id,addon_type,started_at) VALUES (?,?,?,?)'
+    ).run(id, userId, addonType, now);
+    return id;
+  }
+  if (!doc) return id;
+  await doc.send(new PutCommand({
+    TableName: TABLE,
+    Item: { pk: `ADDON_SESSION#${userId}`, sk: `${now}#${id}`, id, userId, addonType, startedAt: now },
+  }));
+  return id;
+}
+
+async function endAddonSession(sessionId, userId) {
+  const now = new Date().toISOString();
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT * FROM addon_sessions WHERE id = ?').get(sessionId);
+    if (!row || row.ended_at) return;
+    const durationSecs = (Date.now() - new Date(row.started_at).getTime()) / 1000;
+    sqliteDb.prepare(
+      'UPDATE addon_sessions SET ended_at = ?, duration_secs = ? WHERE id = ?'
+    ).run(now, durationSecs, sessionId);
+    return;
+  }
+  if (!doc) return;
+  // Fetch the item to compute duration (scan by GSI not available, store sessionId in a lookup key)
+  // Store a secondary lookup record for fast close
+  await doc.send(new PutCommand({
+    TableName: TABLE,
+    Item: { pk: `ADDON_SESSION_END#${sessionId}`, sk: 'end', sessionId, userId, endedAt: now },
+  }));
+}
+
+const ADDON_BLOCK_MINS = 180; // one 3-hour block
+
+// Returns total minutes consumed for one add-on type, including any open (in-progress) session
+async function getAddonUsedMins(userId, addonType) {
+  if (useSqlite) {
+    const row = sqliteDb.prepare(`
+      SELECT COALESCE(SUM(
+        CASE WHEN ended_at IS NOT NULL THEN duration_secs
+             ELSE (strftime('%s','now') - strftime('%s', started_at))
+        END
+      ), 0) AS total_secs
+      FROM addon_sessions
+      WHERE user_id = ? AND addon_type = ?
+    `).get(userId, addonType);
+    return (row?.total_secs || 0) / 60;
+  }
+  if (!doc) return 0;
+  // DynamoDB: sum completed sessions (open sessions tracked client-side)
+  const r = await doc.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'pk = :pk',
+    ExpressionAttributeValues: { ':pk': `ADDON_SESSION#${userId}` },
+  }));
+  const items = (r.Items || []).filter(i => i.addonType === addonType);
+  const secs = items.reduce((s, i) => s + (i.durationSecs || 0), 0);
+  return secs / 60;
+}
+
+async function getAddonUsage(userId) {
+  const ADDONS = ['claude-sonnet', 'xai', 'openai'];
+  if (useSqlite) {
+    const sessionRows = sqliteDb.prepare(
+      `SELECT addon_type,
+              COUNT(*) AS session_count,
+              COALESCE(SUM(duration_secs), 0) AS total_secs,
+              MAX(started_at) AS last_used
+       FROM addon_sessions WHERE user_id = ? GROUP BY addon_type`
+    ).all(userId);
+    const purchaseRows = sqliteDb.prepare(
+      `SELECT addon_type, COALESCE(SUM(minutes_added), 0) AS purchased_mins
+       FROM addon_purchases WHERE user_id = ? GROUP BY addon_type`
+    ).all(userId);
+    const purchasedMap = {};
+    purchaseRows.forEach(r => { purchasedMap[r.addon_type] = r.purchased_mins; });
+    const result = {};
+    ADDONS.forEach(t => { result[t] = { sessionCount: 0, totalMins: 0, purchasedMins: purchasedMap[t] || 0, lastUsed: null }; });
+    sessionRows.forEach(r => {
+      result[r.addon_type] = {
+        sessionCount: r.session_count,
+        totalMins: Math.round(r.total_secs / 60 * 10) / 10,
+        purchasedMins: purchasedMap[r.addon_type] || 0,
+        lastUsed: r.last_used,
+      };
+    });
+    return result;
+  }
+  if (!doc) return Object.fromEntries(ADDONS.map(t => [t, { sessionCount: 0, totalMins: 0, purchasedMins: 0, lastUsed: null }]));
+  const [sessR, purchR] = await Promise.all([
+    doc.send(new QueryCommand({ TableName: TABLE, KeyConditionExpression: 'pk = :pk', ExpressionAttributeValues: { ':pk': `ADDON_SESSION#${userId}` } })),
+    doc.send(new QueryCommand({ TableName: TABLE, KeyConditionExpression: 'pk = :pk', ExpressionAttributeValues: { ':pk': `ADDON_PURCHASE#${userId}` } })),
+  ]);
+  const purchasedMap = {};
+  (purchR.Items || []).forEach(i => {
+    purchasedMap[i.addonType] = (purchasedMap[i.addonType] || 0) + (i.minutesAdded || ADDON_BLOCK_MINS);
+  });
+  const result = {};
+  ADDONS.forEach(t => { result[t] = { sessionCount: 0, totalMins: 0, purchasedMins: purchasedMap[t] || 0, lastUsed: null }; });
+  (sessR.Items || []).forEach(item => {
+    const t = item.addonType;
+    if (!result[t]) return;
+    result[t].sessionCount++;
+    if (item.durationSecs) result[t].totalMins = Math.round((result[t].totalMins * 6 + item.durationSecs / 10) / 6 * 10) / 10;
+    if (!result[t].lastUsed || item.startedAt > result[t].lastUsed) result[t].lastUsed = item.startedAt;
+    result[t].purchasedMins = purchasedMap[t] || 0;
+  });
+  return result;
+}
+
+// ══════════════════════════════════════════
 //  Active Realtime Session Guard
 //  One concurrent realtime session per user.
 //  DynamoDB TTL auto-deletes the record when the token expires.
@@ -806,6 +985,8 @@ module.exports = {
   // Plan & Billing
   setUserPlan, setStripeCustomerId,
   logUsage, getUsageSummary,
+  startAddonSession, endAddonSession, getAddonUsage, getAddonUsedMins,
+  recordAddonPurchase, getAddonPurchasedMins, ADDON_BLOCK_MINS,
   // Realtime session guard
   setActiveSession, getActiveSession, clearActiveSession,
   // Aliases

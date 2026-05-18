@@ -779,6 +779,12 @@ app.post('/api/auth/send-otp', async (req, res) => {
     return res.status(400).json({ error: 'Enter a valid phone number or email address.' });
   try {
     const code = await db.createOTP(id);
+    const isLocal = !process.env.BASE_URL || process.env.BASE_URL.includes('localhost');
+    if (isLocal) {
+      // Dev mode — print code to console instead of sending SMS/email
+      console.log(`\n  🔑  OTP for ${id}: ${code}\n`);
+      return res.json({ sent: true, via: 'console (dev mode)' });
+    }
     if (isEmail(id)) {
       await ses.send(new SendEmailCommand({
         Source: SES_FROM,
@@ -1039,9 +1045,39 @@ app.get('/api/channels/:id/messages', async (req, res) => {
 });
 
 // POST /api/session — xAI ephemeral token (Deluxe xAI only)
+// ── Addon limit guard: 402 if user has consumed all purchased minutes ──
+async function checkAddonLimit(userId, addonType) {
+  const [usedMins, purchasedMins] = await Promise.all([
+    db.getAddonUsedMins(userId, addonType),
+    db.getAddonPurchasedMins(userId, addonType),
+  ]);
+  // If nothing purchased yet, fall back to one block so demos still work
+  const limitMins = purchasedMins > 0 ? purchasedMins : db.ADDON_BLOCK_MINS;
+  const remaining = limitMins - usedMins;
+  return { usedMins, remaining, limitMins, purchasedMins, exceeded: remaining <= 0 };
+}
+
+// GET /api/addon/remaining?addonType=xai — remaining minutes for current user
+app.get('/api/addon/remaining', requireAuth, async (req, res) => {
+  const { addonType } = req.query;
+  const VALID = ['claude-sonnet', 'xai', 'openai'];
+  if (!VALID.includes(addonType)) return res.status(400).json({ error: 'Invalid addonType' });
+  try {
+    const info = await checkAddonLimit(req.user.phone, addonType);
+    res.json(info); // { usedMins, remaining, limitMins, purchasedMins, exceeded }
+  } catch (err) {
+    console.error('addon/remaining error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/session', requireDeluxe, async (req, res) => {
   if (req.deluxeType && req.deluxeType !== 'xai') {
     return res.status(403).json({ error: 'This endpoint is for xAI Deluxe only.' });
+  }
+  const limit = await checkAddonLimit(req.user.phone, 'xai').catch(() => null);
+  if (limit?.exceeded) {
+    return res.status(402).json({ error: 'xAI Voice block exhausted (3-hour limit reached).', usedMins: limit.usedMins, limitMins: limit.limitMins });
   }
   try {
     const r = await fetch('https://api.x.ai/v1/realtime/client_secrets', {
@@ -1064,6 +1100,10 @@ app.post('/api/session', requireDeluxe, async (req, res) => {
 app.post('/api/openai-session', requireDeluxe, async (req, res) => {
   if (req.deluxeType && req.deluxeType !== 'openai') {
     return res.status(403).json({ error: 'This endpoint is for OpenAI Deluxe only.' });
+  }
+  const limit = await checkAddonLimit(req.user.phone, 'openai').catch(() => null);
+  if (limit?.exceeded) {
+    return res.status(402).json({ error: 'OpenAI Realtime block exhausted (3-hour limit reached).', usedMins: limit.usedMins, limitMins: limit.limitMins });
   }
   if (!OPENAI_API_KEY) return res.status(503).json({ error: 'OpenAI API not configured' });
   try {
@@ -1334,6 +1374,130 @@ app.post('/api/billing/create-checkout', requireAuth, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+//  Billing — POST /api/billing/create-checkout-multi
+//  Creates a Stripe Checkout Session with the monthly subscription
+//  plus any selected 3-hour blocks as additional line items
+// ──────────────────────────────────────────────
+app.post('/api/billing/create-checkout-multi', requireAuth, async (req, res) => {
+  if (!STRIPE_SECRET_KEY) return res.status(503).json({ error: 'Stripe not configured' });
+  if (!MONTHLY_PRICE_ID)  return res.status(503).json({ error: 'Monthly plan not configured' });
+  const { blocks = [] } = req.body || {};
+  // Validate block types
+  const validBlocks = blocks.filter(b => DELUXE_PRICE_IDS[b]);
+  try {
+    const stripe = require('stripe')(STRIPE_SECRET_KEY);
+    const user = await db.getUserById(req.user.phone);
+    const baseUrl = process.env.BASE_URL || 'https://test12.net';
+    let customerId = user?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        metadata: { userId: req.user.phone, displayName: user?.displayName || '' },
+      });
+      customerId = customer.id;
+      await db.setStripeCustomerId(req.user.phone, customerId);
+    }
+    // Monthly subscription line item (recurring)
+    // One-time block charges are added to the first invoice via add_invoice_items
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: MONTHLY_PRICE_ID, quantity: 1 }],
+      subscription_data: {
+        // One-time charges billed on the first invoice alongside the subscription
+        add_invoice_items: validBlocks.map(b => ({ price: DELUXE_PRICE_IDS[b], quantity: 1 })),
+        metadata: { userId: req.user.phone, blocks: validBlocks.join(',') },
+      },
+      success_url: `${baseUrl}/?subscribed=1&blocks=${validBlocks.join(',')}`,
+      cancel_url:  `${baseUrl}/`,
+      metadata: { userId: req.user.phone, blocks: validBlocks.join(',') },
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Multi checkout error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────
+//  Add-on session tracking
+//  POST /api/addon/session/start  → { sessionId }
+//  POST /api/addon/session/end    → 204
+//  GET  /api/addon/usage          → { usage: { 'claude-sonnet': { sessionCount, totalMins, lastUsed }, … } }
+// ──────────────────────────────────────────────
+app.post('/api/addon/session/start', requireAuth, async (req, res) => {
+  const { addonType } = req.body || {};
+  const VALID = ['claude-sonnet', 'xai', 'openai'];
+  if (!VALID.includes(addonType)) return res.status(400).json({ error: 'Invalid addonType' });
+  const limit = await checkAddonLimit(req.user.phone, addonType).catch(() => null);
+  if (limit?.exceeded) {
+    return res.status(402).json({ error: `${addonType} block exhausted (3-hour limit reached).`, usedMins: limit.usedMins, limitMins: limit.limitMins });
+  }
+  try {
+    const sessionId = await db.startAddonSession(req.user.phone, addonType);
+    res.json({ sessionId, remainingMins: limit ? Math.max(0, limit.remaining) : db.ADDON_BLOCK_MINS, purchasedMins: limit?.limitMins ?? db.ADDON_BLOCK_MINS });
+  } catch (err) {
+    console.error('addon/session/start error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/addon/session/end', requireAuth, async (req, res) => {
+  const { sessionId } = req.body || {};
+  if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
+  try {
+    await db.endAddonSession(sessionId, req.user.phone);
+    res.sendStatus(204);
+  } catch (err) {
+    console.error('addon/session/end error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/addon/usage', requireAuth, async (req, res) => {
+  try {
+    const usage = await db.getAddonUsage(req.user.phone);
+    res.json({ usage });
+  } catch (err) {
+    console.error('addon/usage error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────
+//  Billing — GET /api/billing/prices
+//  Returns live price amounts from Stripe for each plan
+// ──────────────────────────────────────────────
+app.get('/api/billing/prices', async (req, res) => {
+  if (!STRIPE_SECRET_KEY) return res.json({ prices: {} });
+  try {
+    const stripe = require('stripe')(STRIPE_SECRET_KEY);
+    const ids = {
+      monthly:       MONTHLY_PRICE_ID,
+      'claude-sonnet': DELUXE_PRICE_IDS['claude-sonnet'],
+      xai:           DELUXE_PRICE_IDS['xai'],
+      openai:        DELUXE_PRICE_IDS['openai'],
+    };
+    const entries = await Promise.all(
+      Object.entries(ids).filter(([, id]) => id).map(async ([key, id]) => {
+        const price = await stripe.prices.retrieve(id, { expand: ['product'] });
+        const amount = price.unit_amount / 100;
+        const currency = price.currency.toUpperCase();
+        const label = price.recurring
+          ? `${currency} ${amount.toFixed(2)}/${price.recurring.interval}`
+          : `${currency} ${amount.toFixed(2)}`;
+        const name = price.product?.name || null;
+        return [key, { amount, currency, label, name, recurring: !!price.recurring }];
+      })
+    );
+    res.json({ prices: Object.fromEntries(entries) });
+  } catch (err) {
+    console.error('Stripe prices error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 //  Billing — POST /api/billing/webhook
 //  Stripe webhook: on successful one-time payment → grant 3-hour Deluxe access
 // ──────────────────────────────────────────────
@@ -1353,22 +1517,29 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
   try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      // One-time Deluxe pass
-      if (session.payment_status === 'paid' && session.mode === 'payment') {
-        const userId = session.metadata?.userId;
-        const deluxeType = session.metadata?.deluxeType || 'xai';
-        if (userId) {
-          const expiresAt = new Date(Date.now() + DELUXE_DURATION_HOURS * 60 * 60 * 1000).toISOString();
-          await db.setUserPlan(userId, 'deluxe', null, expiresAt, deluxeType);
-          console.log(`Stripe: user ${userId} → Deluxe[${deluxeType}] for ${DELUXE_DURATION_HOURS}h (expires ${expiresAt})`);
-        }
-      }
-      // Monthly subscription activated
+      // Monthly subscription + optional add-on blocks (create-checkout-multi)
       if (session.mode === 'subscription' && session.subscription) {
         const userId = session.metadata?.userId;
         if (userId) {
           await db.setUserPlan(userId, 'standard', session.subscription);
           console.log(`Stripe: user ${userId} → Standard subscription ${session.subscription}`);
+          // Record any add-on block purchases included in this checkout
+          const blocks = (session.metadata?.blocks || '').split(',').filter(Boolean);
+          for (const addonType of blocks) {
+            if (['claude-sonnet', 'xai', 'openai'].includes(addonType)) {
+              await db.recordAddonPurchase(userId, addonType, session.id);
+              console.log(`Stripe: user ${userId} → addon block purchased: ${addonType} (+${db.ADDON_BLOCK_MINS} min)`);
+            }
+          }
+        }
+      }
+      // Legacy one-time Deluxe pass (old checkout endpoint)
+      if (session.payment_status === 'paid' && session.mode === 'payment' && session.metadata?.deluxeType) {
+        const userId = session.metadata?.userId;
+        const deluxeType = session.metadata.deluxeType;
+        if (userId && ['claude-sonnet', 'xai', 'openai'].includes(deluxeType)) {
+          await db.recordAddonPurchase(userId, deluxeType, session.id);
+          console.log(`Stripe: user ${userId} → legacy one-time addon: ${deluxeType}`);
         }
       }
     }

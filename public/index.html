@@ -17,6 +17,8 @@
   <link rel="apple-touch-icon" sizes="167x167" href="/icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- WebMCP compliance — allows AI browsers to discover and invoke Test12 tools -->
+  <meta name="mcp" content="Test12 — voice-first social platform. Read posts, create posts, manage private channels.">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -63,6 +65,56 @@
       transition: background 0.2s, border-color 0.2s;
     }
     .header-login-link:hover { background: rgba(21,149,178,0.2); border-color: rgba(21,149,178,0.6); }
+
+    /* ── Add-on usage progress bars (top-left of header) ── */
+    #addon-usage-bars {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 190px;
+    }
+    .aub-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .aub-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      width: 2.8rem;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .aub-track {
+      flex: 1;
+      height: 5px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .aub-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+    .aub-fill.ok   { background: #1595b2; }
+    .aub-fill.warn { background: #f59e0b; }
+    .aub-fill.full { background: #ef4444; }
+    .aub-mins {
+      font-size: 0.6rem;
+      color: #94a3b8;
+      width: 5.5rem;
+      text-align: right;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
     header h1 {
       font-size: 1.5rem;
       font-weight: 700;
@@ -75,6 +127,72 @@
       line-height: 1.5;
     }
     header p a { color: #1595b2; text-decoration: none; }
+
+    /* ── Profile modal ── */
+    #profile-overlay {
+      position: fixed; inset: 0; z-index: 9998;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.2s;
+    }
+    #profile-overlay.hidden { opacity: 0; pointer-events: none; }
+    .profile-modal {
+      background: #0f172a; border: 1px solid #1e293b;
+      border-radius: 18px; padding: 2rem 2rem 1.5rem;
+      width: 100%; max-width: 420px; margin: 1rem;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      display: flex; flex-direction: column; gap: 1.2rem;
+    }
+    .profile-modal h2 {
+      font-size: 1.15rem; font-weight: 700; color: #f1f5f9; margin: 0;
+    }
+    .pm-field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .pm-label { font-size: 0.7rem; font-weight: 600; color: #64748b; letter-spacing: 0.06em; text-transform: uppercase; }
+    .pm-input {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #f1f5f9; font-size: 0.9rem; padding: 0.55rem 0.8rem;
+      font-family: inherit; outline: none; width: 100%;
+    }
+    .pm-input:focus { border-color: #1595b2; }
+    .pm-input[readonly] { color: #94a3b8; cursor: default; }
+    .pm-card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .pm-divider { border: none; border-top: 1px solid #1e293b; margin: 0; }
+    .pm-plan { display: flex; flex-direction: column; gap: 0.5rem; }
+    .pm-plan-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.65rem 0.85rem; border-radius: 10px;
+      border: 1px solid #1e293b; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .pm-plan-item:hover { border-color: #1595b2; background: rgba(21,149,178,0.06); }
+    .pm-plan-item input[type=checkbox] { accent-color: #1595b2; width: 1rem; height: 1rem; cursor: pointer; flex-shrink: 0; }
+    .pm-plan-mandatory { cursor: default; border-color: #1595b2; background: rgba(21,149,178,0.08); gap: 0.6rem; }
+    .pm-plan-mandatory:hover { border-color: #1595b2; background: rgba(21,149,178,0.08); }
+    .pm-plan-mandatory-badge { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #1595b2; background: rgba(21,149,178,0.15); border: 1px solid rgba(21,149,178,0.4); border-radius: 4px; padding: 2px 6px; white-space: nowrap; flex-shrink: 0; }
+    .pm-usage { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.1rem; }
+    .pm-usage-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: #94a3b8; }
+    .pm-usage-label { color: #cbd5e1; }
+    .pm-usage-val { font-variant-numeric: tabular-nums; color: #1595b2; font-weight: 600; }
+    .pm-plan-label { flex: 1; }
+    .pm-plan-name { font-size: 0.85rem; font-weight: 600; color: #e2e8f0; }
+    .pm-plan-desc { font-size: 0.72rem; color: #64748b; margin-top: 1px; }
+    .pm-plan-price { font-size: 0.8rem; font-weight: 700; color: #1595b2; white-space: nowrap; }
+    .pm-buy-btn {
+      width: 100%; padding: 0.75rem; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, #1595b2, #0e7490);
+      color: #fff; font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; font-family: inherit; transition: opacity 0.2s;
+    }
+    .pm-buy-btn:hover { opacity: 0.88; }
+    .pm-buy-btn:disabled { opacity: 0.4; cursor: default; }
+    .pm-close {
+      background: none; border: none; color: #64748b; font-size: 1.3rem;
+      cursor: pointer; line-height: 1; padding: 0; align-self: flex-end; margin-top: -0.5rem;
+    }
+    .pm-stripe-note { font-size: 0.68rem; color: #475569; text-align: center; }
+    .pm-msg { font-size: 0.78rem; text-align: center; padding: 0.4rem; border-radius: 6px; }
+    .pm-msg.error { background: rgba(239,68,68,0.12); color: #f87171; }
+    .pm-msg.info  { background: rgba(21,149,178,0.12); color: #38bdf8; }
 
     /* ── Main card ── */
     .agent-card {
@@ -249,6 +367,7 @@
     .log-tag.tool    { background: rgba(245,158,11,0.15); color: #fbbf24; }
     .log-tag.agent   { background: rgba(139,92,246,0.15); color: #a78bfa; }
     .log-tag.error   { background: rgba(239,68,68,0.15); color: #f87171; }
+    .log-tag.warn    { background: rgba(245,158,11,0.15); color: #fbbf24; }
     .log-tag.text    { background: rgba(148,163,184,0.1); color: #94a3b8; }
     .log-body { color: #cbd5e1; word-break: break-word; }
     .log-body b { color: #e2e8f0; font-weight: 600; }
@@ -285,6 +404,23 @@
       padding: 2px 8px; border-radius: 6px; letter-spacing: 0.05em;
       margin-right: 0.5rem;
     }
+    .compose-form {
+      display: flex; gap: 0.4rem; margin-top: 0.6rem;
+      padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .compose-input {
+      flex: 1; padding: 0.45rem 0.75rem; border-radius: 8px;
+      border: 1px solid #334155; background: #1e293b; color: #f1f5f9;
+      font-size: 0.82rem; font-family: inherit; outline: none;
+    }
+    .compose-input:focus { border-color: rgba(21,149,178,0.5); }
+    .compose-btn {
+      padding: 0.45rem 0.9rem; border-radius: 8px; border: none;
+      background: linear-gradient(135deg, #1595b2, #0e7490);
+      color: #fff; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap; font-family: inherit;
+    }
+    .compose-btn:hover { opacity: 0.88; }
     .channel-panel .ch-messages {
       max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
       margin-top: 0;
@@ -616,6 +752,102 @@
     </div>
   </div>
 
+  <!-- ═══ PROFILE / BILLING MODAL ═══ -->
+  <div id="profile-overlay" class="hidden" style="display:none">
+    <div class="profile-modal">
+      <button class="pm-close" id="profile-close">✕</button>
+      <h2>Profile &amp; Plans</h2>
+
+      <div class="pm-field">
+        <span class="pm-label">Username</span>
+        <input class="pm-input" id="pm-username" readonly>
+      </div>
+
+      <hr class="pm-divider">
+
+      <div>
+        <div class="pm-label" style="margin-bottom:0.6rem">Payment card</div>
+        <div class="pm-field" style="margin-bottom:0.6rem">
+          <input class="pm-input" id="pm-card-number" placeholder="1234 5678 9012 3456" maxlength="19" inputmode="numeric" autocomplete="cc-number">
+        </div>
+        <div class="pm-card-row">
+          <div class="pm-field">
+            <span class="pm-label">Expiry (MM/YY)</span>
+            <input class="pm-input" id="pm-card-expiry" placeholder="MM/YY" maxlength="5" inputmode="numeric" autocomplete="cc-exp">
+          </div>
+          <div class="pm-field">
+            <span class="pm-label">CVV</span>
+            <input class="pm-input" id="pm-card-cvv" placeholder="123" maxlength="4" inputmode="numeric" autocomplete="cc-csc">
+          </div>
+        </div>
+      </div>
+
+      <hr class="pm-divider">
+
+      <div class="pm-plan">
+        <div class="pm-label" style="margin-bottom:0.5rem">Plan</div>
+
+        <!-- Mandatory monthly subscription — always included, not selectable -->
+        <div class="pm-plan-item pm-plan-mandatory">
+          <span class="pm-plan-mandatory-badge">Mandatory</span>
+          <div class="pm-plan-label">
+            <div class="pm-plan-name" id="pm-monthly-name">Monthly subscription</div>
+            <div class="pm-plan-desc">Standard access — unlimited voice posts &amp; channels</div>
+          </div>
+          <span class="pm-plan-price" data-price-key="monthly" id="pm-monthly-price">$5/mo</span>
+        </div>
+
+        <div class="pm-label" style="margin:0.6rem 0 0.3rem;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:#64748b">Optional add-ons</div>
+        <label class="pm-plan-item">
+          <input type="checkbox" name="block" value="claude-sonnet">
+          <div class="pm-plan-label">
+            <div class="pm-plan-name">3-hour block — Claude Sonnet PTT</div>
+            <div class="pm-plan-desc">Push-to-talk with Claude Sonnet voice agent</div>
+          </div>
+          <span class="pm-plan-price" data-price-key="claude-sonnet">$3</span>
+        </label>
+        <label class="pm-plan-item">
+          <input type="checkbox" name="block" value="xai">
+          <div class="pm-plan-label">
+            <div class="pm-plan-name">3-hour block — xAI Voice agent</div>
+            <div class="pm-plan-desc">Grok voice realtime with always-on mic</div>
+          </div>
+          <span class="pm-plan-price" data-price-key="xai">$3</span>
+        </label>
+        <label class="pm-plan-item">
+          <input type="checkbox" name="block" value="openai">
+          <div class="pm-plan-label">
+            <div class="pm-plan-name">3-hour block — OpenAI Realtime</div>
+            <div class="pm-plan-desc">GPT-4o realtime with always-on mic</div>
+          </div>
+          <span class="pm-plan-price" data-price-key="openai">$3</span>
+        </label>
+      </div>
+
+      <hr class="pm-divider" style="margin-top:0.8rem">
+
+      <div class="pm-label" style="margin-bottom:0.4rem">Add-on usage</div>
+      <div class="pm-usage" id="pm-usage">
+        <div class="pm-usage-row">
+          <span class="pm-usage-label">Claude Sonnet PTT</span>
+          <span class="pm-usage-val" id="pm-usage-claude-sonnet">—</span>
+        </div>
+        <div class="pm-usage-row">
+          <span class="pm-usage-label">xAI Voice agent</span>
+          <span class="pm-usage-val" id="pm-usage-xai">—</span>
+        </div>
+        <div class="pm-usage-row">
+          <span class="pm-usage-label">OpenAI Realtime</span>
+          <span class="pm-usage-val" id="pm-usage-openai">—</span>
+        </div>
+      </div>
+
+      <div id="pm-msg" class="pm-msg" style="display:none"></div>
+      <button class="pm-buy-btn" id="pm-buy-btn">Subscribe</button>
+      <p class="pm-stripe-note">🔒 Payment processed securely by Stripe. Card details are never stored on our servers.</p>
+    </div>
+  </div>
+
   <!-- ═══ PWA INSTALL BANNER ═══ -->
   <div id="pwa-banner" class="hidden">
     <img src="/icon-192.png" alt="Test12">
@@ -630,10 +862,15 @@
       Logged in as <strong id="profile-name"></strong>
       <span id="plan-badge-el" class="plan-badge standard" title="Your current plan">Standard</span>
     </div>
+    <!-- Add-on usage bars — top left, shown when logged in -->
+    <div id="addon-usage-bars" style="display:none"></div>
     <!-- Log in link — shown when not logged in -->
     <a id="header-login-link" class="header-login-link" href="#" onclick="event.preventDefault();showLoginModal();">Log in</a>
-    <!-- Sign out button — shown when logged in, top right -->
-    <button id="logout-btn" class="header-login-link" style="display:none;background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);color:#ef4444;">Sign out</button>
+    <!-- Profile + Sign out buttons — shown when logged in, top right -->
+    <div id="header-auth-btns" style="display:none;position:absolute;top:0.4rem;right:0.6rem;display:none;gap:0.4rem;align-items:center;">
+      <button id="profile-btn" class="header-login-link" style="position:static;">Profile</button>
+      <button id="logout-btn" class="header-login-link" style="position:static;">Sign out</button>
+    </div>
     <p>
       Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, reply to a post, reply to a reply, create private channels and invite a friends through SMS to a private channel. I support 25 languages!
     </p>
@@ -676,6 +913,14 @@
       <div class="ch-messages" id="public-messages">
         <div class="ch-empty">Loading posts…</div>
       </div>
+      <form class="compose-form" id="compose-public" onsubmit="return false"
+            mcp-tool mcp-name="create_post" mcp-description="Create a new public post on Test12."
+            method="POST" action="/api/voice-posts">
+        <input class="compose-input" placeholder="Write a post…" autocomplete="off" maxlength="500"
+               name="text" mcp-name="text" mcp-description="The post content" required>
+        <input type="hidden" name="author" mcp-name="author" mcp-description="Author display name">
+        <button class="compose-btn" type="submit">Post</button>
+      </form>
     </div>
   </div>
 
@@ -1119,7 +1364,9 @@ if (logoutBtn) logoutBtn.addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
   clearAuthSession();
   profileBadge.style.display = 'none';
-  if (logoutBtn) logoutBtn.style.display = 'none';
+  const authBtns = document.getElementById('header-auth-btns');
+  if (authBtns) authBtns.style.display = 'none';
+  if (_aubContainer) _aubContainer.style.display = 'none';
   const hll = document.getElementById('header-login-link');
   if (hll) hll.style.display = '';
   showLoginModal();
@@ -1129,11 +1376,13 @@ function onLoggedIn() {
   const label = currentUser.displayName || currentUser.phone;
   profileName.textContent = label;
   profileBadge.style.display = 'flex';
-  // Swap Log in link → Sign out button
+  // Swap Log in link → Profile + Sign out buttons
   const hll = document.getElementById('header-login-link');
   if (hll) hll.style.display = 'none';
-  if (logoutBtn) logoutBtn.style.display = '';
+  const authBtns = document.getElementById('header-auth-btns');
+  if (authBtns) authBtns.style.display = 'flex';
   hideLoginModal();
+  refreshAddonUsageBars();
   if (currentUser.phone) saveProfileToHistory(currentUser.phone, currentUser.displayName);
   // Save USERID to datalist history
   if (currentUser.displayName) saveUidToHistory(currentUser.displayName);
@@ -1676,8 +1925,57 @@ function log(tag, msg) {
 
 clearBtn.addEventListener('click', () => { logsEl.innerHTML = ''; });
 
+// ── Add-on usage progress bars ──
+const ADDON_BAR_DEFS = [
+  { key: 'claude-sonnet', label: 'Claude' },
+  { key: 'xai',           label: 'xAI'    },
+  { key: 'openai',        label: 'OpenAI' },
+];
+const _aubContainer = document.getElementById('addon-usage-bars');
+
+function _fmtMins(m) {
+  if (m >= 60) return `${Math.floor(m / 60)}h${Math.round(m % 60).toString().padStart(2,'0')}m`;
+  return `${Math.round(m)}m`;
+}
+
+function renderAddonUsageBars(usageMap) {
+  if (!_aubContainer) return;
+  _aubContainer.innerHTML = ADDON_BAR_DEFS.map(({ key, label }) => {
+    const u = usageMap[key] || { totalMins: 0, purchasedMins: 0, sessionCount: 0 };
+    const limit = u.purchasedMins > 0 ? u.purchasedMins : ADDON_LIMIT_MINS;
+    const used  = Math.min(u.totalMins, limit);
+    const pct   = Math.min(100, (used / limit) * 100);
+    const fillClass = pct >= 100 ? 'full' : pct / 100 >= 0.83 ? 'warn' : 'ok';
+    const usedLabel  = _fmtMins(used);
+    const totalLabel = _fmtMins(limit);
+    return `<div class="aub-row" data-key="${key}">
+      <span class="aub-label">${label}</span>
+      <div class="aub-track"><div class="aub-fill ${fillClass}" style="width:${pct.toFixed(1)}%"></div></div>
+      <span class="aub-mins">${usedLabel}<span style="color:#334155"> / ${totalLabel}</span></span>
+    </div>`;
+  }).join('');
+}
+
+async function refreshAddonUsageBars() {
+  if (!currentUser) return;
+  try {
+    const r = await fetch('/api/addon/usage', { headers: authHeaders() });
+    if (!r.ok) return;
+    const { usage } = await r.json();
+    renderAddonUsageBars(usage);
+    _aubContainer.style.display = 'flex';
+  } catch (_) {}
+}
+
 // ── MCP call helper ──
 async function mcpCall(toolName, toolArgs) {
+  // Client-side intercept: tools that need the user's auth token
+  if (toolName === 'get_addon_usage') {
+    const r = await fetch('/api/addon/usage', { headers: authHeaders() });
+    if (!r.ok) throw new Error(`addon/usage error ${r.status}`);
+    return r.json();
+  }
+
   const res = await fetch(MCP_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream' },
@@ -1700,6 +1998,104 @@ async function mcpCall(toolName, toolArgs) {
 // 'llm'           → Browser PTT + Claude Haiku (Standard monthly)
 let currentDeluxeType = localStorage.getItem('deluxeType') || 'xai';
 let VA_MODE = 'llm'; // default — updated after login in refreshVAMode()
+let _addonSessionId      = null;  // active addon session ID for usage logging
+let _addonBaseUsedMins   = 0;     // past minutes used at session start (fetched once)
+let _addonPurchasedMins  = 180;   // total minutes purchased for current addon (from server)
+let _addonSessionStart   = 0;     // Date.now() when WebSocket connected
+let _addonUsageTimer     = null;  // 60-second tick interval
+const ADDON_LIMIT_MINS   = 180;   // one 3-hour block (default / fallback)
+
+function _vaModeToAddonType(mode) {
+  if (mode === 'deluxe-xai')    return 'xai';
+  if (mode === 'deluxe-openai') return 'openai';
+  if (mode === 'deluxe-claude') return 'claude-sonnet';
+  return null;
+}
+
+async function _startAddonSession() {
+  const addonType = _vaModeToAddonType(VA_MODE);
+  if (!addonType) return;
+  try {
+    const r = await fetch('/api/addon/session/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ addonType }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      _addonSessionId     = d.sessionId;
+      _addonSessionStart  = Date.now();
+      _addonPurchasedMins = d.purchasedMins  ?? ADDON_LIMIT_MINS;
+      _addonBaseUsedMins  = _addonPurchasedMins - (d.remainingMins ?? _addonPurchasedMins);
+      _startUsageTimer(addonType);
+    }
+  } catch (_) {}
+}
+
+function _endAddonSession() {
+  _stopUsageTimer();
+  if (!_addonSessionId) return;
+  const id = _addonSessionId;
+  _addonSessionId = null;
+  fetch('/api/addon/session/end', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ sessionId: id }),
+  }).then(() => refreshAddonUsageBars()).catch(() => {});
+}
+
+function _startUsageTimer(addonType) {
+  _stopUsageTimer();
+  _addonUsageTimer = setInterval(() => {
+    const elapsedMins = (Date.now() - _addonSessionStart) / 60000;
+    const totalUsed   = _addonBaseUsedMins + elapsedMins;
+    const remaining   = Math.max(0, _addonPurchasedMins - totalUsed);
+
+    // Update just the active addon bar locally (no network round-trip)
+    refreshAddonUsageBarsLive(addonType, totalUsed);
+
+    if (remaining <= 0) {
+      log('error', '⏱️ 3-hour block fully used. Disconnecting…');
+      setStatus('Block exhausted');
+      disconnectBtn.click();
+      return;
+    }
+    if (remaining <= 10) {
+      const mins = Math.ceil(remaining);
+      log('warn', `⚠️ ${mins} minute${mins !== 1 ? 's' : ''} remaining on your ${addonType} block.`);
+      setStatus(`⚠️ ${mins} min left`);
+    }
+  }, 60 * 1000); // every 60 seconds
+}
+
+// Update only the active addon bar without a server round-trip
+function refreshAddonUsageBarsLive(addonType, usedMins) {
+  if (!_aubContainer) return;
+  const row = _aubContainer.querySelector(`.aub-row[data-key="${addonType}"]`);
+  if (!row) { refreshAddonUsageBars(); return; } // fallback: full refresh
+  // Read the current total from the rendered label (e.g. "30m / 3h00m")
+  const minsEl = row.querySelector('.aub-mins');
+  const limitText = minsEl?.querySelector('span')?.textContent?.replace(' / ', '').trim();
+  // Parse back to minutes for the limit (approximate; real value comes from server on disconnect)
+  let limit = ADDON_LIMIT_MINS;
+  if (limitText) {
+    const hMatch = limitText.match(/(\d+)h(\d+)m/);
+    const mMatch = limitText.match(/^(\d+)m$/);
+    if (hMatch) limit = parseInt(hMatch[1]) * 60 + parseInt(hMatch[2]);
+    else if (mMatch) limit = parseInt(mMatch[1]);
+  }
+  const pct = Math.min(100, (usedMins / limit) * 100);
+  const fillClass = pct >= 100 ? 'full' : pct / 100 >= 0.83 ? 'warn' : 'ok';
+  const fill = row.querySelector('.aub-fill');
+  if (fill) { fill.style.width = pct.toFixed(1) + '%'; fill.className = `aub-fill ${fillClass}`; }
+  if (minsEl) {
+    minsEl.innerHTML = `${_fmtMins(usedMins)}<span style="color:#334155"> / ${_fmtMins(limit)}</span>`;
+  }
+}
+
+function _stopUsageTimer() {
+  if (_addonUsageTimer) { clearInterval(_addonUsageTimer); _addonUsageTimer = null; }
+}
 
 function refreshVAMode() {
   if (currentPlan === 'deluxe') {
@@ -1727,6 +2123,7 @@ const MCP_TOOLS_SCHEMA = [
   { name: 'list_aliases', description: 'List all nickname aliases saved for this account.', parameters: { type: 'object', properties: {}, required: [] } },
   { name: 'set_alias', description: 'Save a nickname so a username shows a friendlier name everywhere.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Raw username e.g. WOLF.PX7K3A' }, alias: { type: 'string', description: 'Friendly nickname to display' } }, required: ['username', 'alias'] } },
   { name: 'remove_alias', description: 'Remove a saved nickname alias by username.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Username whose alias to remove' } }, required: ['username'] } },
+  { name: 'get_addon_usage', description: 'Get voice add-on usage: minutes consumed per 3-hour block product (claude-sonnet, xai, openai). Returns session count, total minutes, and last-used date for each add-on.', parameters: { type: 'object', properties: {}, required: [] } },
 ];
 
 // ── Claude Haiku dispatcher (Standard plan — /api/claude-chat) ──
@@ -1768,8 +2165,18 @@ async function dispatchWithClaude(transcript) {
     'list_aliases', 'set_alias', 'remove_alias',
   ]);
 
+  // If no tool was called and we're in a private channel, post the text directly
+  if (!data.toolCalls?.length && activeChannelId && activeChannelId !== 'public') {
+    const author = currentUser?.displayName || 'Guest';
+    await mcpCall('send_channel_message', { channel_id: activeChannelId, author, text: transcript });
+    loadChannelMessages(activeChannelId);
+    ptSpeak('Sent.'); log('agent', 'Message sent to channel.');
+    return;
+  }
+
   if (data.toolCalls?.length) {
-    for (const tc of data.toolCalls) {
+    for (let tc of data.toolCalls) {
+      ({ name: tc.name, input: tc.input } = resolveToolForActiveChannel(tc.name, tc.input));
       log('tool', `${tc.name}(${JSON.stringify(tc.input)})`);
       try {
         // Only call MCP for tools that run server-side via the MCP endpoint
@@ -1788,8 +2195,10 @@ async function dispatchWithClaude(transcript) {
           if (!joinResp.ok) {
             const je = await joinResp.json().catch(() => ({}));
             log('error', `Auto-join failed (${joinResp.status}): ${je.error || ''}`);
-          } else { addMyChannelId(newCh.id); }
+          }
+          addMyChannelId(newCh.id);
           await loadPrivateChannels();
+          setActiveChannel(newCh.id);
           const idSpoken = newCh.id.split('').join(' ');
           ptSpeak(`Channel ${newCh.name} created. Your channel ID is ${idSpoken}. You have been joined automatically.`);
         }
@@ -1836,7 +2245,7 @@ async function dispatchWithGrok(transcript) {
   const systemPrompt =
     `You are a concise voice assistant for Test12, a social voice-posting platform. The user's username is "${author}". `
     + `Active channel: "${activeChannelId || 'public'}". `
-    + `Use the available tools to fulfill the user's request. Respond in 1-2 short sentences after the tool call.`;
+    + `Respond in 1-2 short sentences after the tool call.`;
 
   const body = {
     model: 'grok-3-mini',
@@ -1863,9 +2272,7 @@ async function dispatchWithGrok(transcript) {
   let toolResultText = '';
   if (msg.tool_calls?.length) {
     for (const tc of msg.tool_calls) {
-      const name = tc.function.name;
-      let args = {};
-      try { args = JSON.parse(tc.function.arguments); } catch(_) {}
+      let { name, input: args } = resolveToolForActiveChannel(tc.function.name, (() => { try { return JSON.parse(tc.function.arguments); } catch(_) { return {}; } })());
       log('tool', `Called: <b>${name}</b>`);
       const result = await mcpCall(name, args);
 
@@ -1873,7 +2280,14 @@ async function dispatchWithGrok(transcript) {
       if (name === 'list_posts' || name === 'create_post') { setActiveChannel('public'); loadPublicPosts(); }
       if (['join_private_channel','create_private_channel','send_channel_message','read_channel_messages'].includes(name)) {
         const cid = args.channel_id || result?.channel?.id || result?.id;
-        if (cid) { addMyChannelId(cid); setActiveChannel(cid); loadPrivateChannels(); }
+        if (cid) {
+          if (name === 'create_private_channel') {
+            await fetch(`/api/channels/${cid}/join`, { method: 'POST', headers: authHeaders() }).catch(() => {});
+          }
+          addMyChannelId(cid);
+          await loadPrivateChannels();
+          setActiveChannel(cid);
+        }
       }
 
       // Build a brief summary of the result for the LLM's follow-up
@@ -1903,6 +2317,14 @@ async function dispatchWithGrok(transcript) {
     const reply = msg.content || 'I\'m not sure how to help with that.';
     ptSpeak(reply); log('agent', reply);
   }
+}
+
+// Ensure any "post" goes to the active channel, not always public
+function resolveToolForActiveChannel(name, input) {
+  if (name === 'create_post' && activeChannelId && activeChannelId !== 'public') {
+    return { name: 'send_channel_message', input: { channel_id: activeChannelId, author: input.author, text: input.text } };
+  }
+  return { name, input };
 }
 
 // ── Intent → MCP tool dispatcher ──
@@ -2058,9 +2480,10 @@ function updateAgentUI() {
     connectBtn.disabled=false; disconnectBtn.disabled=true; rtWs=null;
     // Free the session slot immediately (don't wait for DynamoDB TTL)
     fetch('/api/session/end', { method: 'POST', headers: authHeaders() }).catch(() => {});
+    _endAddonSession();
   }
 
-  function handleRealtimeEvent(ev) {
+  async function handleRealtimeEvent(ev) {
     const msg = JSON.parse(ev.data);
     switch (msg.type) {
       case 'session.created': log('ws','Session created — model: <b>'+(msg.session?.model||'?')+'</b>'); break;
@@ -2094,8 +2517,14 @@ function updateAgentUI() {
         if (tn==='list_posts'||tn==='create_post'){setActiveChannel('public');loadPublicPosts();}
         if (['read_channel_messages','send_channel_message','join_private_channel','create_private_channel'].includes(tn)){
           const cid=out.channel?.id||out.channel_id||out.id;
-          if(cid){addMyChannelId(cid);setActiveChannel(cid);}
-          loadPrivateChannels();
+          if(cid){
+            if(tn==='create_private_channel'){
+              await fetch(`/api/channels/${cid}/join`,{method:'POST',headers:authHeaders()}).catch(()=>{});
+            }
+            addMyChannelId(cid);
+            await loadPrivateChannels();
+            setActiveChannel(cid);
+          }
         } break;
       }
       case 'error': log('error',msg.error?.message||JSON.stringify(msg.error)); break;
@@ -2149,6 +2578,7 @@ function updateAgentUI() {
       rtWs.onopen = () => {
         rtIsConnected=true; log('ws','<b>WebSocket connected</b>'); setStatus('Configuring session…');
         connectBtn.disabled=true; disconnectBtn.disabled=false;
+        _startAddonSession();
         // Session config differs slightly between providers
         if (VA_MODE === 'deluxe-xai') {
           rtWs.send(JSON.stringify({type:'session.update',session:{
@@ -2436,6 +2866,28 @@ async function loadPublicPosts() {
   } catch (_) {}
 }
 
+// Public compose form
+(function wirePublicCompose() {
+  const form = document.getElementById('compose-public');
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = form.querySelector('.compose-input');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    const author = currentUser?.displayName || 'Guest';
+    try {
+      await fetch('/api/voice-posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ text, author }),
+      });
+      loadPublicPosts();
+    } catch (err) { log('error', 'Post failed: ' + err.message); }
+  });
+})();
+
 // Load private channels
 async function loadPrivateChannels() {
   try {
@@ -2458,12 +2910,16 @@ async function loadPrivateChannels() {
 
     const renderChannel = ch => {
       const date = new Date(ch.created_at).toLocaleString();
-      return `<div class="channel-panel" id="channel-${ch.id}" data-channel="${ch.id}" onclick="setActiveChannel('${ch.id}')">
+      return `<div class="channel-panel" id="channel-${ch.id}" data-channel="${ch.id}">
         <div class="ch-name"><span class="ch-id">${ch.id}</span>${ch.name}</div>
         <div class="ch-meta">Created by ${ch.created_by} · ${date}</div>
         <div class="ch-messages" id="ch-msgs-${ch.id}">
           <div class="ch-empty">Click to view messages</div>
         </div>
+        <form class="compose-form" id="compose-${ch.id}" onsubmit="return false">
+          <input class="compose-input" placeholder="Write a message…" autocomplete="off" maxlength="500">
+          <button class="compose-btn" type="submit">Send</button>
+        </form>
       </div>`;
     };
 
@@ -2485,6 +2941,34 @@ async function loadPrivateChannels() {
         if (panel) panel.classList.add('active');
       });
     }
+
+    // Activate channel on any click inside its panel
+    data.channels.forEach(ch => {
+      const panel = document.getElementById(`channel-${ch.id}`);
+      if (panel) panel.addEventListener('click', () => setActiveChannel(ch.id));
+    });
+
+    // Wire compose forms for each private channel
+    data.channels.forEach(ch => {
+      const form = document.getElementById(`compose-${ch.id}`);
+      if (!form) return;
+      form.addEventListener('submit', async (e) => {
+        e.stopPropagation();
+        const input = form.querySelector('.compose-input');
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        const author = currentUser?.displayName || 'Guest';
+        try {
+          await fetch(`/api/channels/${ch.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ author, text }),
+          });
+          loadChannelMessages(ch.id);
+        } catch (err) { log('error', 'Send failed: ' + err.message); }
+      });
+    });
 
     // Auto-join via URL param
     if (isAutoJoin && autoChannelId) {
@@ -2742,7 +3226,144 @@ async function _applySession(d) {
 
 // finishReveal handled by revealBtn legacy listener
 
+// ═══════════════════════════════════════════════════
+//  Profile / Billing Modal
+// ═══════════════════════════════════════════════════
+(function() {
+  const overlay  = document.getElementById('profile-overlay');
+  const closeBtn = document.getElementById('profile-close');
+  const profBtn  = document.getElementById('profile-btn');
+  const buyBtn   = document.getElementById('pm-buy-btn');
+  const msgEl    = document.getElementById('pm-msg');
+  const checks   = () => Array.from(document.querySelectorAll('.pm-plan-item input[type=checkbox]'));
+
+  async function openProfileModal() {
+    document.getElementById('pm-username').value = currentUser?.displayName || currentUser?.phone || '';
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.classList.remove('hidden'));
+    // Fetch live prices from Stripe and add-on usage in parallel
+    const [pricesRes, usageRes] = await Promise.allSettled([
+      fetch('/api/billing/prices'),
+      fetch('/api/addon/usage', { headers: authHeaders() }),
+    ]);
+
+    if (pricesRes.status === 'fulfilled' && pricesRes.value.ok) {
+      const { prices } = await pricesRes.value.json();
+      Object.entries(prices).forEach(([key, p]) => {
+        const priceEl = document.querySelector(`[data-price-key="${key}"]`);
+        if (priceEl) priceEl.textContent = p.label;
+        if (key === 'monthly' && p.name) {
+          const nameEl = document.getElementById('pm-monthly-name');
+          if (nameEl) nameEl.textContent = p.name;
+        }
+      });
+    }
+
+    if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
+      const { usage } = await usageRes.value.json();
+      const fmt = (u) => {
+        if (!u || u.sessionCount === 0) return '0 min';
+        const mins = u.totalMins;
+        return mins >= 60
+          ? `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m (${u.sessionCount} session${u.sessionCount > 1 ? 's' : ''})`
+          : `${mins} min (${u.sessionCount} session${u.sessionCount > 1 ? 's' : ''})`;
+      };
+      ['claude-sonnet', 'xai', 'openai'].forEach(key => {
+        const el = document.getElementById(`pm-usage-${key}`);
+        if (el) el.textContent = fmt(usage[key]);
+      });
+    }
+  }
+  function closeProfileModal() {
+    overlay.classList.add('hidden');
+    setTimeout(() => { overlay.style.display = 'none'; }, 250);
+  }
+
+  if (profBtn)  profBtn.addEventListener('click', openProfileModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeProfileModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeProfileModal(); });
+
+  // Update button label when checkboxes change
+  checks().forEach(cb => {
+    cb.addEventListener('change', () => { msgEl.style.display = 'none'; });
+  });
+
+  // Card number formatting (groups of 4)
+  const cardNumEl = document.getElementById('pm-card-number');
+  if (cardNumEl) {
+    cardNumEl.addEventListener('input', () => {
+      let v = cardNumEl.value.replace(/\D/g, '').substring(0, 16);
+      cardNumEl.value = v.replace(/(.{4})/g, '$1 ').trim();
+    });
+  }
+
+  // Expiry formatting (MM/YY)
+  const expiryEl = document.getElementById('pm-card-expiry');
+  if (expiryEl) {
+    expiryEl.addEventListener('input', () => {
+      let v = expiryEl.value.replace(/\D/g, '').substring(0, 4);
+      if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+      expiryEl.value = v;
+    });
+  }
+
+  // Purchase — always includes monthly subscription + any checked blocks
+  buyBtn.addEventListener('click', async () => {
+    const selectedBlocks = checks().filter(c => c.checked).map(c => c.value);
+    buyBtn.disabled = true;
+    buyBtn.textContent = 'Redirecting to Stripe…';
+    msgEl.style.display = 'none';
+    try {
+      const r = await fetch('/api/billing/create-checkout-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ blocks: selectedBlocks }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Payment setup failed');
+      window.location.href = d.url;
+    } catch (err) {
+      msgEl.textContent = err.message;
+      msgEl.className = 'pm-msg error';
+      msgEl.style.display = 'block';
+      buyBtn.disabled = false;
+      buyBtn.textContent = 'Subscribe';
+    }
+  });
+
+  // Expose so onLoggedIn can call it
+  window.openProfileModal = openProfileModal;
+})();
+
 </script>
+
+<!-- ═══ WebMCP declarative tool registry (hidden — for AI browser discovery) ═══ -->
+<div style="display:none" aria-hidden="true">
+  <form mcp-tool mcp-name="list_posts" mcp-description="Fetch the latest public posts from Test12."
+        method="GET" action="/api/voice-posts">
+    <input name="limit" mcp-name="limit" mcp-description="Max number of posts to return (default 50)" type="number" min="1" max="200">
+  </form>
+  <form mcp-tool mcp-name="join_private_channel" mcp-description="Join an existing private channel by its 6-character ID."
+        method="POST" action="/api/channels/__channel_id__/join">
+    <input name="channel_id" mcp-name="channel_id" mcp-description="The 6-character channel ID" required>
+    <input name="author" mcp-name="author" mcp-description="Your display name" required>
+  </form>
+  <form mcp-tool mcp-name="send_channel_message" mcp-description="Send a message to a private channel."
+        method="POST" action="/api/channels/__channel_id__/messages">
+    <input name="channel_id" mcp-name="channel_id" mcp-description="The 6-character channel ID" required>
+    <input name="author" mcp-name="author" mcp-description="Your display name" required>
+    <input name="text" mcp-name="text" mcp-description="Message text" required>
+  </form>
+  <form mcp-tool mcp-name="create_private_channel" mcp-description="Create a new private channel."
+        method="POST" action="/api/channels">
+    <input name="name" mcp-name="name" mcp-description="Channel name">
+    <input name="author" mcp-name="author" mcp-description="Your display name" required>
+  </form>
+  <form mcp-tool mcp-name="get_addon_usage"
+        mcp-description="Get voice add-on usage per product: minutes consumed from each 3-hour block (claude-sonnet PTT, xAI Voice, OpenAI Realtime). Returns session count, total minutes, and last-used timestamp."
+        method="GET" action="/api/addon/usage">
+  </form>
+</div>
 </body>
 </html>
 

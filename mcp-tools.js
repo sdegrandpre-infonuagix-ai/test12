@@ -427,6 +427,25 @@ function registerTools(server, z) {
     }
   );
 
+  // ── Add-on Usage ──
+
+  server.tool(
+    'get_addon_usage',
+    'Get the voice add-on usage for a user: minutes consumed per 3-hour block product (claude-sonnet, xai, openai). Returns session count, total minutes used, and last-used timestamp for each add-on.',
+    { userId: z.string().describe('The authenticated user ID (phone or email)') },
+    async ({ userId }) => {
+      if (!db.isReady()) throw new Error('Database not connected');
+      const usage = await db.getAddonUsage(userId);
+      const summary = Object.entries(usage).map(([addonType, u]) => ({
+        addonType,
+        sessionCount: u.sessionCount,
+        totalMins: u.totalMins,
+        lastUsed: u.lastUsed,
+      }));
+      return { content: [{ type: 'text', text: JSON.stringify({ usage: summary }, null, 2) }] };
+    }
+  );
+
   // ── Alias Tools ──
 
   server.tool(
