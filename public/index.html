@@ -156,6 +156,16 @@
     .pm-input:focus { border-color: #1595b2; }
     .pm-input[readonly] { color: #94a3b8; cursor: default; }
     .pm-card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .pm-stripe-card-wrap {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0.75rem 0.875rem;
+      transition: border-color 0.2s;
+    }
+    .pm-stripe-card-wrap.StripeElement--focus { border-color: #1595b2; }
+    .pm-stripe-card-wrap.StripeElement--invalid { border-color: #ef4444; }
+    .pm-card-error { font-size: 0.75rem; color: #f87171; margin-top: 0.35rem; }
     .pm-divider { border: none; border-top: 1px solid #1e293b; margin: 0; }
     .pm-plan { display: flex; flex-direction: column; gap: 0.5rem; }
     .pm-plan-item {
@@ -641,6 +651,8 @@
       color: #fbbf24; border: 1px solid rgba(250,204,21,0.4);
     }
   </style>
+  <!-- Stripe.js — loaded async, used only when the Profile modal is open -->
+  <script src="https://js.stripe.com/v3/" async></script>
 </head>
 <body>
 
@@ -767,19 +779,9 @@
 
       <div>
         <div class="pm-label" style="margin-bottom:0.6rem">Payment card</div>
-        <div class="pm-field" style="margin-bottom:0.6rem">
-          <input class="pm-input" id="pm-card-number" placeholder="1234 5678 9012 3456" maxlength="19" inputmode="numeric" autocomplete="cc-number">
-        </div>
-        <div class="pm-card-row">
-          <div class="pm-field">
-            <span class="pm-label">Expiry (MM/YY)</span>
-            <input class="pm-input" id="pm-card-expiry" placeholder="MM/YY" maxlength="5" inputmode="numeric" autocomplete="cc-exp">
-          </div>
-          <div class="pm-field">
-            <span class="pm-label">CVV</span>
-            <input class="pm-input" id="pm-card-cvv" placeholder="123" maxlength="4" inputmode="numeric" autocomplete="cc-csc">
-          </div>
-        </div>
+        <!-- Stripe Elements mount point — replaced by secure hosted iframes -->
+        <div id="pm-stripe-card" class="pm-stripe-card-wrap"></div>
+        <div id="pm-card-errors" class="pm-card-error" style="display:none"></div>
       </div>
 
       <hr class="pm-divider">
