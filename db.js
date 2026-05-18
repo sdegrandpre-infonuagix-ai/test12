@@ -3,12 +3,70 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, DeleteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const crypto = require('crypto');
+const path = require('path');
 
 const TABLE = process.env.DDB_DATA_TABLE || 'test12-data';
 const MAX_LEVEL = 3;
 
 let doc = null;
 let lastError = null;
+let useSqlite = false;
+let sqliteDb = null;
+
+// ── SQLite backend (auto-activated when DynamoDB is unreachable) ──
+
+function initSqlite() {
+  const Database = require('better-sqlite3');
+  sqliteDb = new Database(path.join(__dirname, 'local.db'));
+  sqliteDb.pragma('journal_mode = WAL');
+  sqliteDb.exec(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id TEXT PRIMARY KEY, text TEXT NOT NULL, author TEXT NOT NULL,
+      parent_id TEXT, level INTEGER DEFAULT 1, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS channels (
+      id TEXT PRIMARY KEY, name TEXT, created_by TEXT,
+      max_users INTEGER DEFAULT 2, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS channel_messages (
+      id TEXT PRIMARY KEY, channel_id TEXT NOT NULL,
+      author TEXT, text TEXT, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chanmsg_channel ON channel_messages(channel_id, created_at);
+    CREATE TABLE IF NOT EXISTS otps (
+      phone TEXT PRIMARY KEY, code TEXT NOT NULL, ttl INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY, phone TEXT NOT NULL, ttl INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      phone TEXT PRIMARY KEY, display_name TEXT, pin_hash TEXT,
+      plan TEXT DEFAULT 'standard', plus_code TEXT,
+      stripe_customer_id TEXT, stripe_subscription_id TEXT,
+      deluxe_expires_at TEXT, deluxe_type TEXT,
+      last_seen TEXT, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS channel_members (
+      phone TEXT NOT NULL, channel_id TEXT NOT NULL, joined_at TEXT NOT NULL,
+      PRIMARY KEY (phone, channel_id)
+    );
+    CREATE TABLE IF NOT EXISTS usage_logs (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, model TEXT,
+      input_tokens INTEGER, output_tokens INTEGER,
+      cost_usd REAL, ts TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_logs(user_id, ts);
+    CREATE TABLE IF NOT EXISTS active_sessions (
+      phone TEXT PRIMARY KEY, type TEXT, expires_at TEXT,
+      ttl INTEGER, created_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS aliases (
+      user_id TEXT NOT NULL, username TEXT NOT NULL, alias TEXT NOT NULL,
+      updated_at TEXT NOT NULL, PRIMARY KEY (user_id, username)
+    );
+  `);
+  console.log('SQLite: using local.db (DynamoDB unavailable)');
+}
 
 // ── Helpers ──
 
@@ -38,20 +96,27 @@ function fmtPost(i) {
 async function init() {
   try {
     const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
-    doc = DynamoDBDocumentClient.from(client, {
+    const candidate = DynamoDBDocumentClient.from(client, {
       marshallOptions: { removeUndefinedValues: true },
     });
+    // Probe DynamoDB with a real request — if the IAM user lacks permissions, fall back to SQLite
+    await candidate.send(new GetCommand({ TableName: TABLE, Key: { pk: '__probe__', sk: '__probe__' } }));
+    doc = candidate;
+    useSqlite = false;
     lastError = null;
     console.log(`DynamoDB: using table "${TABLE}"`);
     return true;
   } catch (err) {
-    lastError = err;
+    // Fall back to local SQLite for development
     doc = null;
-    return false;
+    useSqlite = true;
+    initSqlite();
+    lastError = null;
+    return true;
   }
 }
 
-function isReady() { return doc !== null; }
+function isReady() { return doc !== null || useSqlite; }
 function getLastError() { return lastError; }
 
 // No-op — tables created by deploy script
@@ -62,6 +127,11 @@ async function initChannelTables() {}
 // ══════════════════════════════════════════
 
 async function getPostById(id) {
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT * FROM posts WHERE id = ?').get(String(id));
+    if (!row) return null;
+    return { id: row.id, text: row.text, author: row.author, parent_id: row.parent_id || null, level: row.level, date: row.created_at };
+  }
   if (!doc) throw new Error('Database not connected');
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: 'POST', sk: String(id) },
@@ -70,6 +140,22 @@ async function getPostById(id) {
 }
 
 async function insertPost({ text, author, parentId = null }) {
+  if (useSqlite) {
+    const id = genId();
+    const now = new Date().toISOString();
+    let level = 1;
+    let cleanParentId = null;
+    if (parentId != null && parentId !== '') {
+      const parent = await getPostById(String(parentId));
+      if (!parent) { const e = new Error('Parent post not found'); e.code = 'PARENT_NOT_FOUND'; throw e; }
+      if (parent.level >= MAX_LEVEL) { const e = new Error(`Cannot reply: max depth (${MAX_LEVEL}) reached`); e.code = 'MAX_DEPTH'; throw e; }
+      cleanParentId = parent.id;
+      level = parent.level + 1;
+    }
+    sqliteDb.prepare('INSERT INTO posts (id,text,author,parent_id,level,created_at) VALUES (?,?,?,?,?,?)')
+      .run(id, text, author, cleanParentId, level, now);
+    return { id, text, author, parent_id: cleanParentId, level, date: now };
+  }
   if (!doc) throw new Error('Database not connected');
 
   const id = genId();
@@ -86,21 +172,24 @@ async function insertPost({ text, author, parentId = null }) {
   }
 
   const item = { id, text, author, level, parentId: cleanParentId, createdAt: now };
-
-  // 1. Detail record
   await doc.send(new PutCommand({ TableName: TABLE, Item: { pk: 'POST', sk: id, ...item } }));
-
-  // 2. Listing record (FEED for top-level, REPLIES#<parentId> for replies)
   const listPk = cleanParentId ? `REPLIES#${cleanParentId}` : 'FEED';
   await doc.send(new PutCommand({ TableName: TABLE, Item: { pk: listPk, sk: sk(now, id), ...item } }));
-
   return fmtPost(item);
 }
 
 async function listPosts({ limit = 50 } = {}) {
+  if (useSqlite) {
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const rows = sqliteDb.prepare(
+      'SELECT * FROM posts WHERE parent_id IS NULL ORDER BY created_at DESC LIMIT ?'
+    ).all(safeLimit);
+    const posts = rows.map(r => ({ id: r.id, text: r.text, author: r.author, parent_id: null, level: r.level, date: r.created_at }));
+    await Promise.all(posts.map(async p => { p.replies = await fetchReplies(p.id, 2); }));
+    return posts;
+  }
   if (!doc) throw new Error('Database not connected');
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-
   const r = await doc.send(new QueryCommand({
     TableName: TABLE,
     KeyConditionExpression: 'pk = :pk',
@@ -108,16 +197,25 @@ async function listPosts({ limit = 50 } = {}) {
     ScanIndexForward: false,
     Limit: safeLimit,
   }));
-
   const posts = (r.Items || []).map(fmtPost);
-
-  // Fetch replies in parallel (max depth 3)
   await Promise.all(posts.map(async p => { p.replies = await fetchReplies(p.id, 2); }));
   return posts;
 }
 
 async function fetchReplies(parentId, lvl) {
   if (lvl > MAX_LEVEL) return [];
+  if (useSqlite) {
+    const rows = sqliteDb.prepare(
+      'SELECT * FROM posts WHERE parent_id = ? ORDER BY created_at ASC'
+    ).all(String(parentId));
+    const replies = rows.map(r => ({ id: r.id, text: r.text, author: r.author, parent_id: r.parent_id, level: r.level, date: r.created_at }));
+    if (lvl < MAX_LEVEL) {
+      await Promise.all(replies.map(async rep => { rep.replies = await fetchReplies(rep.id, lvl + 1); }));
+    } else {
+      replies.forEach(rep => { rep.replies = []; });
+    }
+    return replies;
+  }
   const r = await doc.send(new QueryCommand({
     TableName: TABLE,
     KeyConditionExpression: 'pk = :pk',
@@ -138,24 +236,25 @@ async function fetchReplies(parentId, lvl) {
 // ══════════════════════════════════════════
 
 async function createChannel({ id, name, createdBy, maxUsers = 2 }) {
-  if (!doc) throw new Error('Database not connected');
   const now = new Date().toISOString();
-  const item = {
-    id, name: name || 'Private Chat',
-    created_by: createdBy,
-    max_users: Math.min(Math.max(maxUsers, 2), 2),
-    created_at: now,
-  };
-
-  // Detail
+  const item = { id, name: name || 'Private Chat', created_by: createdBy, max_users: Math.min(Math.max(maxUsers, 2), 2), created_at: now };
+  if (useSqlite) {
+    sqliteDb.prepare('INSERT OR REPLACE INTO channels (id,name,created_by,max_users,created_at) VALUES (?,?,?,?,?)')
+      .run(item.id, item.name, item.created_by, item.max_users, item.created_at);
+    return item;
+  }
+  if (!doc) throw new Error('Database not connected');
   await doc.send(new PutCommand({ TableName: TABLE, Item: { pk: 'CHANNEL', sk: id, ...item } }));
-  // Listing
   await doc.send(new PutCommand({ TableName: TABLE, Item: { pk: 'CHANNELS', sk: sk(now, id), ...item } }));
-
   return item;
 }
 
 async function getChannelById(id) {
+  if (useSqlite) {
+    const r = sqliteDb.prepare('SELECT * FROM channels WHERE id = ?').get(String(id));
+    if (!r) return null;
+    return { id: r.id, name: r.name, created_by: r.created_by, max_users: r.max_users, created_at: r.created_at };
+  }
   if (!doc) throw new Error('Database not connected');
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: 'CHANNEL', sk: String(id) }, ConsistentRead: true,
@@ -166,6 +265,11 @@ async function getChannelById(id) {
 }
 
 async function listChannels({ limit = 50 } = {}) {
+  if (useSqlite) {
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    return sqliteDb.prepare('SELECT * FROM channels ORDER BY created_at DESC LIMIT ?').all(safeLimit)
+      .map(r => ({ id: r.id, name: r.name, created_by: r.created_by, max_users: r.max_users, created_at: r.created_at }));
+  }
   if (!doc) throw new Error('Database not connected');
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
   const r = await doc.send(new QueryCommand({
@@ -185,11 +289,15 @@ async function listChannels({ limit = 50 } = {}) {
 // ══════════════════════════════════════════
 
 async function insertChannelMessage({ channelId, author, text }) {
-  if (!doc) throw new Error('Database not connected');
   const now = new Date().toISOString();
   const id = sk(now, genId());
   const item = { id, channel_id: channelId, author, text, created_at: now };
-
+  if (useSqlite) {
+    sqliteDb.prepare('INSERT INTO channel_messages (id,channel_id,author,text,created_at) VALUES (?,?,?,?,?)')
+      .run(id, channelId, author, text, now);
+    return item;
+  }
+  if (!doc) throw new Error('Database not connected');
   await doc.send(new PutCommand({
     TableName: TABLE, Item: { pk: `CHANMSG#${channelId}`, sk: id, ...item },
   }));
@@ -197,9 +305,21 @@ async function insertChannelMessage({ channelId, author, text }) {
 }
 
 async function listChannelMessages({ channelId, limit = 100, afterId = 0 }) {
-  if (!doc) throw new Error('Database not connected');
   const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
-
+  if (useSqlite) {
+    let rows;
+    if (afterId && String(afterId) !== '0') {
+      rows = sqliteDb.prepare(
+        'SELECT * FROM channel_messages WHERE channel_id = ? AND id > ? ORDER BY created_at ASC LIMIT ?'
+      ).all(channelId, String(afterId), safeLimit);
+    } else {
+      rows = sqliteDb.prepare(
+        'SELECT * FROM channel_messages WHERE channel_id = ? ORDER BY created_at ASC LIMIT ?'
+      ).all(channelId, safeLimit);
+    }
+    return rows.map(r => ({ id: r.id, channel_id: r.channel_id, author: r.author, text: r.text, created_at: r.created_at }));
+  }
+  if (!doc) throw new Error('Database not connected');
   const params = {
     TableName: TABLE,
     KeyConditionExpression: 'pk = :pk',
@@ -207,12 +327,9 @@ async function listChannelMessages({ channelId, limit = 100, afterId = 0 }) {
     ScanIndexForward: true,
     Limit: safeLimit,
   };
-
-  // String afterId = use as cursor (ExclusiveStartKey)
   if (afterId && String(afterId) !== '0') {
     params.ExclusiveStartKey = { pk: `CHANMSG#${channelId}`, sk: String(afterId) };
   }
-
   const r = await doc.send(new QueryCommand(params));
   return (r.Items || []).map(i => ({
     id: i.id, channel_id: i.channel_id || channelId, author: i.author, text: i.text, created_at: i.created_at,
@@ -225,7 +342,11 @@ async function listChannelMessages({ channelId, limit = 100, afterId = 0 }) {
 
 async function createOTP(phone) {
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const ttl = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+  const ttl = Math.floor(Date.now() / 1000) + 300;
+  if (useSqlite) {
+    sqliteDb.prepare('INSERT OR REPLACE INTO otps (phone,code,ttl) VALUES (?,?,?)').run(phone, code, ttl);
+    return code;
+  }
   await doc.send(new PutCommand({
     TableName: TABLE,
     Item: { pk: `OTP#${phone}`, sk: 'OTP', phone, code, ttl },
@@ -234,6 +355,13 @@ async function createOTP(phone) {
 }
 
 async function verifyAndConsumeOTP(phone, code) {
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT * FROM otps WHERE phone = ?').get(phone);
+    if (!row || row.code !== String(code)) return false;
+    if (row.ttl < Math.floor(Date.now() / 1000)) return false;
+    sqliteDb.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
+    return true;
+  }
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: `OTP#${phone}`, sk: 'OTP' },
   }));
@@ -250,7 +378,11 @@ async function verifyAndConsumeOTP(phone, code) {
 
 async function createSession(phone) {
   const token = crypto.randomBytes(32).toString('hex');
-  const ttl = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30; // 30 days
+  const ttl = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30;
+  if (useSqlite) {
+    sqliteDb.prepare('INSERT INTO sessions (token,phone,ttl) VALUES (?,?,?)').run(token, phone, ttl);
+    return token;
+  }
   await doc.send(new PutCommand({
     TableName: TABLE,
     Item: { pk: `SESSION#${token}`, sk: 'SESSION', phone, token, ttl },
@@ -260,6 +392,12 @@ async function createSession(phone) {
 
 async function getSession(token) {
   if (!token) return null;
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+    if (!row) return null;
+    if (row.ttl < Math.floor(Date.now() / 1000)) return null;
+    return { phone: row.phone, token: row.token };
+  }
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: `SESSION#${token}`, sk: 'SESSION' },
   }));
@@ -269,6 +407,10 @@ async function getSession(token) {
 }
 
 async function deleteSession(token) {
+  if (useSqlite) {
+    sqliteDb.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    return;
+  }
   await doc.send(new DeleteCommand({ TableName: TABLE, Key: { pk: `SESSION#${token}`, sk: 'SESSION' } }));
 }
 
@@ -287,15 +429,33 @@ function generateUsername() {
 }
 
 async function autoRegister(userId, pin, plusCode) {
-  const crypto = require('crypto');
   const pinHash = crypto.createHash('sha256').update(userId + ':' + pin).digest('hex');
+  if (useSqlite) {
+    const now = new Date().toISOString();
+    const existing = sqliteDb.prepare('SELECT * FROM users WHERE phone = ?').get(userId);
+    let isNew = false;
+    if (existing) {
+      const sets = ['last_seen = ?'];
+      const vals = [now];
+      if (plusCode && plusCode !== existing.plus_code) { sets.push('plus_code = ?'); vals.push(plusCode); }
+      if (!existing.pin_hash) { sets.push('pin_hash = ?'); vals.push(pinHash); }
+      vals.push(userId);
+      sqliteDb.prepare(`UPDATE users SET ${sets.join(', ')} WHERE phone = ?`).run(...vals);
+    } else {
+      isNew = true;
+      sqliteDb.prepare('INSERT INTO users (phone,display_name,pin_hash,plus_code,created_at) VALUES (?,?,?,?,?)')
+        .run(userId, userId, pinHash, plusCode || null, now);
+    }
+    const user = sqliteDb.prepare('SELECT * FROM users WHERE phone = ?').get(userId);
+    const token = await createSession(userId);
+    return { token, displayName: user.display_name || userId, isNew };
+  }
   const pk = `USER#${userId}`;
   const r = await doc.send(new GetCommand({ TableName: TABLE, Key: { pk, sk: 'PROFILE' } }));
   let user;
   let isNew = false;
   if (r.Item) {
     user = r.Item;
-    // Update plusCode and pinHash
     const upd = { ':t': new Date().toISOString() };
     let expr = 'SET lastSeen = :t';
     if (plusCode && plusCode !== user.plusCode) { upd[':p'] = plusCode; expr += ', plusCode = :p'; }
@@ -306,13 +466,7 @@ async function autoRegister(userId, pin, plusCode) {
     }));
   } else {
     isNew = true;
-    user = {
-      pk, sk: 'PROFILE',
-      phone: userId,
-      displayName: userId,
-      pinHash, plusCode,
-      createdAt: new Date().toISOString(),
-    };
+    user = { pk, sk: 'PROFILE', phone: userId, displayName: userId, pinHash, plusCode, createdAt: new Date().toISOString() };
     await doc.send(new PutCommand({ TableName: TABLE, Item: user }));
   }
   const token = await createSession(userId);
@@ -320,8 +474,14 @@ async function autoRegister(userId, pin, plusCode) {
 }
 
 async function pinLogin(userId, pin) {
-  const crypto = require('crypto');
   const pinHash = crypto.createHash('sha256').update(userId + ':' + pin).digest('hex');
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT * FROM users WHERE phone = ?').get(userId);
+    if (!row) throw new Error('Unknown username');
+    if (row.pin_hash !== pinHash) throw new Error('Incorrect password');
+    const token = await createSession(userId);
+    return { token, displayName: row.display_name || userId };
+  }
   const pk = `USER#${userId}`;
   const r = await doc.send(new GetCommand({ TableName: TABLE, Key: { pk, sk: 'PROFILE' } }));
   if (!r.Item) throw new Error('Unknown username');
@@ -331,19 +491,29 @@ async function pinLogin(userId, pin) {
 }
 
 async function getOrCreateUser(phone) {
+  if (useSqlite) {
+    const existing = sqliteDb.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
+    if (existing) return { phone: existing.phone, displayName: existing.display_name, plan: existing.plan || 'standard' };
+    const now = new Date().toISOString();
+    const displayName = generateUsername();
+    sqliteDb.prepare('INSERT INTO users (phone,display_name,plan,created_at) VALUES (?,?,?,?)').run(phone, displayName, 'standard', now);
+    return { phone, displayName, plan: 'standard', createdAt: now };
+  }
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: `USER#${phone}`, sk: 'PROFILE' },
   }));
   if (r.Item) return r.Item;
-  const user = {
-    pk: `USER#${phone}`, sk: 'PROFILE',
-    phone, displayName: generateUsername(), createdAt: new Date().toISOString(),
-  };
+  const user = { pk: `USER#${phone}`, sk: 'PROFILE', phone, displayName: generateUsername(), createdAt: new Date().toISOString() };
   await doc.send(new PutCommand({ TableName: TABLE, Item: user }));
   return user;
 }
 
 async function updateUserProfile(phone, { displayName }) {
+  if (useSqlite) {
+    sqliteDb.prepare('UPDATE users SET display_name = ? WHERE phone = ?')
+      .run(String(displayName).substring(0, 60), phone);
+    return;
+  }
   await doc.send(new UpdateCommand({
     TableName: TABLE,
     Key: { pk: `USER#${phone}`, sk: 'PROFILE' },
@@ -357,6 +527,11 @@ async function updateUserProfile(phone, { displayName }) {
 // ══════════════════════════════════════════
 
 async function addChannelMember(phone, channelId) {
+  if (useSqlite) {
+    sqliteDb.prepare('INSERT OR REPLACE INTO channel_members (phone,channel_id,joined_at) VALUES (?,?,?)')
+      .run(phone, channelId, new Date().toISOString());
+    return;
+  }
   await doc.send(new PutCommand({
     TableName: TABLE,
     Item: { pk: `MEMBER#${phone}`, sk: channelId, channelId, phone, joinedAt: new Date().toISOString() },
@@ -364,6 +539,10 @@ async function addChannelMember(phone, channelId) {
 }
 
 async function getUserChannelIds(phone) {
+  if (useSqlite) {
+    return sqliteDb.prepare('SELECT channel_id FROM channel_members WHERE phone = ?').all(phone)
+      .map(r => r.channel_id);
+  }
   const r = await doc.send(new QueryCommand({
     TableName: TABLE,
     KeyConditionExpression: 'pk = :pk',
@@ -374,6 +553,10 @@ async function getUserChannelIds(phone) {
 }
 
 async function isChannelMember(phone, channelId) {
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT 1 FROM channel_members WHERE phone = ? AND channel_id = ?').get(phone, channelId);
+    return !!row;
+  }
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: `MEMBER#${phone}`, sk: channelId },
   }));
@@ -385,6 +568,15 @@ async function isChannelMember(phone, channelId) {
 // ══════════════════════════════════════════
 
 async function getUserById(phone) {
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
+    if (!row) return null;
+    return {
+      phone: row.phone, displayName: row.display_name, plan: row.plan || 'standard',
+      pinHash: row.pin_hash, deluxeExpiresAt: row.deluxe_expires_at, deluxeType: row.deluxe_type,
+      stripeCustomerId: row.stripe_customer_id, stripeSubscriptionId: row.stripe_subscription_id,
+    };
+  }
   if (!doc) return null;
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: `USER#${phone}`, sk: 'PROFILE' },
@@ -397,17 +589,20 @@ async function getUserById(phone) {
 // ══════════════════════════════════════════
 
 async function setUserPlan(phone, plan, stripeSubscriptionId, deluxeExpiresAt) {
+  if (useSqlite) {
+    const sets = ['plan = ?'];
+    const vals = [plan];
+    if (deluxeExpiresAt !== undefined) { sets.push('deluxe_expires_at = ?'); vals.push(deluxeExpiresAt || null); }
+    if (stripeSubscriptionId !== undefined) { sets.push('stripe_subscription_id = ?'); vals.push(stripeSubscriptionId || null); }
+    vals.push(phone);
+    sqliteDb.prepare(`UPDATE users SET ${sets.join(', ')} WHERE phone = ?`).run(...vals);
+    return;
+  }
   if (!doc) return;
   const upd = { ':p': plan, ':t': new Date().toISOString() };
   let expr = 'SET #plan = :p, updatedAt = :t';
-  // Store expiry for one-time Deluxe passes
-  if (deluxeExpiresAt) {
-    upd[':e'] = deluxeExpiresAt;
-    expr += ', deluxeExpiresAt = :e';
-  } else if (plan === 'standard') {
-    // Clear expiry on downgrade
-    expr += ' REMOVE deluxeExpiresAt';
-  }
+  if (deluxeExpiresAt) { upd[':e'] = deluxeExpiresAt; expr += ', deluxeExpiresAt = :e'; }
+  else if (plan === 'standard') { expr += ' REMOVE deluxeExpiresAt'; }
   if (stripeSubscriptionId !== undefined) {
     if (stripeSubscriptionId) { upd[':s'] = stripeSubscriptionId; expr += ', stripeSubscriptionId = :s'; }
     else { expr += ' REMOVE stripeSubscriptionId'; }
@@ -422,6 +617,10 @@ async function setUserPlan(phone, plan, stripeSubscriptionId, deluxeExpiresAt) {
 }
 
 async function setStripeCustomerId(phone, customerId) {
+  if (useSqlite) {
+    sqliteDb.prepare('UPDATE users SET stripe_customer_id = ? WHERE phone = ?').run(customerId, phone);
+    return;
+  }
   if (!doc) return;
   await doc.send(new UpdateCommand({
     TableName: TABLE,
@@ -436,6 +635,13 @@ async function setStripeCustomerId(phone, customerId) {
 // ══════════════════════════════════════════
 
 async function logUsage({ userId, model, inputTokens, outputTokens, costUsd }) {
+  if (useSqlite) {
+    const now = new Date().toISOString();
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    sqliteDb.prepare('INSERT INTO usage_logs (id,user_id,model,input_tokens,output_tokens,cost_usd,ts) VALUES (?,?,?,?,?,?,?)')
+      .run(id, userId, model, inputTokens, outputTokens, Math.round((costUsd || 0) * 1e8) / 1e8, now);
+    return;
+  }
   if (!doc) return;
   const now = new Date().toISOString();
   const id  = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
@@ -445,13 +651,28 @@ async function logUsage({ userId, model, inputTokens, outputTokens, costUsd }) {
       pk: `USAGE#${userId}`,
       sk: `${now}#${id}`,
       userId, model, inputTokens, outputTokens,
-      costUsd: Math.round(costUsd * 1e8) / 1e8, // 8 decimal places
+      costUsd: Math.round(costUsd * 1e8) / 1e8,
       ts: now,
     },
   }));
 }
 
 async function getUsageSummary({ userId, from, to } = {}) {
+  if (useSqlite) {
+    let query = 'SELECT * FROM usage_logs WHERE user_id = ?';
+    const args = [userId];
+    if (from) { query += ' AND ts >= ?'; args.push(from); }
+    if (to)   { query += ' AND ts <= ?'; args.push(to + '~'); }
+    const items = sqliteDb.prepare(query).all(...args);
+    return {
+      userId,
+      requestCount: items.length,
+      totalInputTokens:  items.reduce((s, i) => s + (i.input_tokens  || 0), 0),
+      totalOutputTokens: items.reduce((s, i) => s + (i.output_tokens || 0), 0),
+      totalCostUsd:      Math.round(items.reduce((s, i) => s + (i.cost_usd || 0), 0) * 1e6) / 1e6,
+      from: from || null, to: to || null,
+    };
+  }
   if (!doc) return { totalInputTokens: 0, totalOutputTokens: 0, totalCostUsd: 0, requestCount: 0 };
   const params = {
     TableName: TABLE,
@@ -459,14 +680,8 @@ async function getUsageSummary({ userId, from, to } = {}) {
     ExpressionAttributeValues: { ':pk': `USAGE#${userId}` },
     ScanIndexForward: false,
   };
-  if (from) {
-    params.KeyConditionExpression += ' AND sk >= :from';
-    params.ExpressionAttributeValues[':from'] = from;
-  }
-  if (to) {
-    params.KeyConditionExpression += ' AND sk <= :to';
-    params.ExpressionAttributeValues[':to'] = to + '~'; // inclusive
-  }
+  if (from) { params.KeyConditionExpression += ' AND sk >= :from'; params.ExpressionAttributeValues[':from'] = from; }
+  if (to)   { params.KeyConditionExpression += ' AND sk <= :to';   params.ExpressionAttributeValues[':to'] = to + '~'; }
   const r = await doc.send(new QueryCommand(params));
   const items = r.Items || [];
   return {
@@ -475,8 +690,7 @@ async function getUsageSummary({ userId, from, to } = {}) {
     totalInputTokens:  items.reduce((s, i) => s + (i.inputTokens  || 0), 0),
     totalOutputTokens: items.reduce((s, i) => s + (i.outputTokens || 0), 0),
     totalCostUsd:      Math.round(items.reduce((s, i) => s + (i.costUsd || 0), 0) * 1e6) / 1e6,
-    from: from || null,
-    to:   to   || null,
+    from: from || null, to: to || null,
   };
 }
 
@@ -487,10 +701,15 @@ async function getUsageSummary({ userId, from, to } = {}) {
 // ══════════════════════════════════════════
 
 async function setActiveSession(phone, type, durationSeconds) {
-  if (!doc) return;
   const now = Date.now();
   const expiresAt = new Date(now + durationSeconds * 1000).toISOString();
-  const ttl = Math.floor(now / 1000) + durationSeconds + 120; // DynamoDB auto-deletes after TTL
+  const ttl = Math.floor(now / 1000) + durationSeconds + 120;
+  if (useSqlite) {
+    sqliteDb.prepare('INSERT OR REPLACE INTO active_sessions (phone,type,expires_at,ttl,created_at) VALUES (?,?,?,?,?)')
+      .run(phone, type, expiresAt, ttl, new Date(now).toISOString());
+    return expiresAt;
+  }
+  if (!doc) return;
   await doc.send(new PutCommand({
     TableName: TABLE,
     Item: { pk: `USER#${phone}`, sk: 'ACTIVE_SESSION', type, expiresAt, ttl, createdAt: new Date(now).toISOString() },
@@ -499,16 +718,26 @@ async function setActiveSession(phone, type, durationSeconds) {
 }
 
 async function getActiveSession(phone) {
+  if (useSqlite) {
+    const row = sqliteDb.prepare('SELECT * FROM active_sessions WHERE phone = ?').get(phone);
+    if (!row) return null;
+    if (new Date(row.expires_at) <= new Date()) return null;
+    return { phone: row.phone, type: row.type, expiresAt: row.expires_at };
+  }
   if (!doc) return null;
   const r = await doc.send(new GetCommand({
     TableName: TABLE, Key: { pk: `USER#${phone}`, sk: 'ACTIVE_SESSION' },
   }));
   if (!r.Item) return null;
-  if (new Date(r.Item.expiresAt) <= new Date()) return null; // expired but TTL not yet fired
+  if (new Date(r.Item.expiresAt) <= new Date()) return null;
   return r.Item;
 }
 
 async function clearActiveSession(phone) {
+  if (useSqlite) {
+    sqliteDb.prepare('DELETE FROM active_sessions WHERE phone = ?').run(phone);
+    return;
+  }
   if (!doc) return;
   await doc.send(new DeleteCommand({
     TableName: TABLE, Key: { pk: `USER#${phone}`, sk: 'ACTIVE_SESSION' },
@@ -523,19 +752,29 @@ async function clearActiveSession(phone) {
 // ════════════════════════════════════════════
 
 async function getAliases(userId) {
+  if (useSqlite) {
+    const rows = sqliteDb.prepare('SELECT username, alias FROM aliases WHERE user_id = ?').all(userId);
+    const map = {};
+    for (const row of rows) map[row.username] = row.alias;
+    return map;
+  }
   if (!doc) throw new Error('Database not connected');
   const r = await doc.send(new QueryCommand({
     TableName: TABLE,
     KeyConditionExpression: 'pk = :pk',
     ExpressionAttributeValues: { ':pk': `ALIAS#${userId}` },
   }));
-  // Return as plain object { username: alias } for easy consumption
   const map = {};
   for (const item of (r.Items || [])) map[item.sk] = item.alias;
   return map;
 }
 
 async function setAlias(userId, username, alias) {
+  if (useSqlite) {
+    sqliteDb.prepare('INSERT OR REPLACE INTO aliases (user_id,username,alias,updated_at) VALUES (?,?,?,?)')
+      .run(userId, username, alias, new Date().toISOString());
+    return;
+  }
   if (!doc) throw new Error('Database not connected');
   await doc.send(new PutCommand({
     TableName: TABLE,
@@ -544,6 +783,10 @@ async function setAlias(userId, username, alias) {
 }
 
 async function removeAlias(userId, username) {
+  if (useSqlite) {
+    sqliteDb.prepare('DELETE FROM aliases WHERE user_id = ? AND username = ?').run(userId, username);
+    return;
+  }
   if (!doc) throw new Error('Database not connected');
   await doc.send(new DeleteCommand({
     TableName: TABLE, Key: { pk: `ALIAS#${userId}`, sk: username },
