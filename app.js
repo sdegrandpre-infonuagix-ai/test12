@@ -32,7 +32,10 @@ const ALLOWED_ORIGINS = process.env.BASE_URL
   ? [process.env.BASE_URL, 'http://localhost:3000']
   : true; // allow all in local dev when BASE_URL unset
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.use((req, res, next) => {
+  if ((req.headers['content-type'] || '').startsWith('multipart/')) return next();
+  express.json({ limit: '10mb' })(req, res, next);
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ──────────────────────────────────────────────
@@ -75,10 +78,14 @@ app.post('/api/stt', requireAuth, upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No audio file provided' });
     }
 
+    // Normalize mime type — strip codec suffix (e.g. audio/webm;codecs=opus → audio/webm)
+    const rawMime = (req.file.mimetype || 'audio/webm').split(';')[0].trim();
+    const ext = rawMime.includes('ogg') ? 'ogg' : rawMime.includes('mp4') ? 'mp4' : 'webm';
+
     const formData = new (require('form-data'))();
     formData.append('file', req.file.buffer, {
-      filename: req.file.originalname || 'audio.webm',
-      contentType: req.file.mimetype || 'audio/webm',
+      filename: `audio.${ext}`,
+      contentType: rawMime,
     });
     formData.append('model', 'grok-stt');
 
@@ -93,7 +100,7 @@ app.post('/api/stt', requireAuth, upload.single('file'), async (req, res) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('xAI STT error:', response.status, errText);
+      console.error('xAI STT error:', response.status, errText, '| mime:', rawMime, '| size:', req.file.buffer.length);
       return res.status(response.status).json({ error: `STT API error: ${response.status}`, details: errText });
     }
 
@@ -1719,6 +1726,18 @@ app.delete('/api/aliases/:username', requireAuth, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+//  Admin — GET /api/admin/users — list all registered users
+app.get('/api/admin/users', async (req, res) => {
+  const adminKey = req.headers['x-admin-key'];
+  if (!adminKey || adminKey !== process.env.ADMIN_SECRET_KEY) return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const users = await db.listUsers();
+    res.json({ users });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 //  Admin — GET /api/admin/usage
 //  Returns usage summary for a specific user (admin only via secret header)
 // ──────────────────────────────────────────────

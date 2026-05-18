@@ -972,6 +972,26 @@ async function removeAlias(userId, username) {
   }));
 }
 
+async function listUsers() {
+  if (useSqlite) {
+    return sqliteDb.prepare('SELECT phone, display_name, plan, created_at FROM users ORDER BY created_at DESC').all()
+      .map(r => ({ id: r.phone, displayName: r.display_name, plan: r.plan, createdAt: r.created_at }));
+  }
+  const { ScanCommand } = require('@aws-sdk/lib-dynamodb');
+  let items = [], lastKey;
+  do {
+    const r = await doc.send(new ScanCommand({
+      TableName: TABLE,
+      FilterExpression: 'sk = :sk',
+      ExpressionAttributeValues: { ':sk': 'PROFILE' },
+      ExclusiveStartKey: lastKey,
+    }));
+    items = items.concat(r.Items || []);
+    lastKey = r.LastEvaluatedKey;
+  } while (lastKey);
+  return items.map(u => ({ id: u.phone || u.pk, displayName: u.displayName || '', plan: u.plan || 'standard', createdAt: u.createdAt || '' }));
+}
+
 module.exports = {
   init, isReady, getLastError, MAX_LEVEL,
   insertPost, listPosts, getPostById,
@@ -980,7 +1000,7 @@ module.exports = {
   // Auth
   createOTP, verifyAndConsumeOTP,
   createSession, getSession, deleteSession,
-  getOrCreateUser, getUserById, updateUserProfile, autoRegister, pinLogin,
+  getOrCreateUser, getUserById, listUsers, updateUserProfile, autoRegister, pinLogin,
   addChannelMember, getUserChannelIds, isChannelMember,
   // Plan & Billing
   setUserPlan, setStripeCustomerId,
