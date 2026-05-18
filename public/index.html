@@ -69,15 +69,20 @@
 
     /* ── Add-on usage progress bars (top-left of header) ── */
     #addon-usage-bars {
-      position: absolute;
-      top: 0.5rem;
-      left: 0.6rem;
       display: flex;
       flex-direction: column;
+      align-items: center;
       gap: 4px;
-      min-width: 190px;
+      width: 100%;
+      padding: 0.75rem 1rem 0;
     }
     .aub-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: min(360px, 90vw);
+    }
+    .aub-bar-line {
       display: flex;
       align-items: center;
       gap: 6px;
@@ -88,9 +93,8 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
       color: #64748b;
-      width: 2.8rem;
-      flex-shrink: 0;
       white-space: nowrap;
+      text-align: left;
     }
     .aub-track {
       flex: 1;
@@ -126,6 +130,7 @@
       font-size: 0.85rem;
       color: #94a3b8;
       line-height: 1.5;
+      text-align: center;
     }
     header p a { color: #1595b2; text-decoration: none; }
 
@@ -133,14 +138,15 @@
     #profile-overlay {
       position: fixed; inset: 0; z-index: 9998;
       background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: flex-start; justify-content: center;
+      overflow-y: auto; padding: 1.5rem 1rem;
       transition: opacity 0.2s;
     }
     #profile-overlay.hidden { opacity: 0; pointer-events: none; }
     .profile-modal {
       background: #0f172a; border: 1px solid #1e293b;
       border-radius: 18px; padding: 2rem 2rem 1.5rem;
-      width: 100%; max-width: 420px; margin: 1rem;
+      width: 100%; max-width: 560px;
       box-shadow: 0 24px 64px rgba(0,0,0,0.5);
       display: flex; flex-direction: column; gap: 1.2rem;
     }
@@ -811,10 +817,7 @@
     <h1><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1595b2" style="width:1.3rem;height:1.3rem;vertical-align:-0.15em;margin-right:0.3rem"><path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 18.93V22h2v-2.07A8.001 8.001 0 0 0 20 12h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/></svg>Test 1 2 - The Vocal Social Network</h1>
     <div class="profile-badge" id="profile-badge" style="display:none">
       Logged in as <strong id="profile-name"></strong>
-      <span id="plan-badge-el" class="plan-badge standard" title="Your current plan">Standard</span>
     </div>
-    <!-- Add-on usage bars — top left, shown when logged in -->
-    <div id="addon-usage-bars" style="display:none"></div>
     <!-- Log in link — shown when not logged in -->
     <a id="header-login-link" class="header-login-link" href="#" onclick="event.preventDefault();showLoginModal();">Log in</a>
     <!-- Profile + Sign out buttons — shown when logged in, top right -->
@@ -903,6 +906,8 @@
   </div>
 
   <!-- ═══ FOOTER ═══ -->
+  <!-- Add-on usage bars — bottom of page, above footer -->
+  <div id="addon-usage-bars" style="display:none"></div>
   <footer class="powered-footer">
     A platform developed by <a href="https://infonuagix.ai" target="_blank" rel="noopener">Infonuagix.ai</a>
   </footer>
@@ -959,8 +964,9 @@ function setCurrentPlan(plan) {
   currentPlan = (plan === 'deluxe') ? 'deluxe' : 'standard';
   const badge = document.getElementById('plan-badge-el');
   if (!badge) return;
-  badge.textContent = currentPlan === 'deluxe' ? '⭐ Deluxe' : 'Standard';
+  badge.textContent = '⭐ Deluxe';
   badge.className   = `plan-badge ${currentPlan}`;
+  badge.style.display = currentPlan === 'deluxe' ? '' : 'none';
   // Show/hide voice toggle based on plan
   const voiceToggleWrap = document.querySelector('.voice-toggle-wrap');
   if (voiceToggleWrap) {
@@ -1902,8 +1908,10 @@ function renderAddonUsageBars(usageMap) {
     const totalLabel = _fmtMins(limit);
     return `<div class="aub-row" data-key="${key}">
       <span class="aub-label">${label}</span>
-      <div class="aub-track"><div class="aub-fill ${fillClass}" style="width:${pct.toFixed(1)}%"></div></div>
-      <span class="aub-mins">${usedLabel}<span style="color:#334155"> / ${totalLabel}</span></span>
+      <div class="aub-bar-line">
+        <div class="aub-track"><div class="aub-fill ${fillClass}" style="width:${pct.toFixed(1)}%"></div></div>
+        <span class="aub-mins">${usedLabel}<span style="color:#334155"> / ${totalLabel}</span></span>
+      </div>
     </div>`;
   }).join('');
 }
