@@ -1380,14 +1380,20 @@ app.post('/api/billing/create-checkout', requireAuth, async (req, res) => {
 //  plus any selected 3-hour blocks as additional line items
 // ──────────────────────────────────────────────
 app.post('/api/billing/create-checkout-multi', requireAuth, async (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   if (!STRIPE_SECRET_KEY) return res.status(503).json({ error: 'Stripe not configured' });
-  if (!MONTHLY_PRICE_ID)  return res.status(503).json({ error: 'Monthly plan not configured' });
-  const { blocks = [] } = req.body || {};
-  // Validate block types
-  const validBlocks = blocks.filter(b => DELUXE_PRICE_IDS[b]);
+  // Accept priceIds[] (dynamic) or legacy blocks[] (addonKey names)
+  const { priceIds = [], blocks = [] } = req.body || {};
+  const legacyPriceIds = blocks.filter(b => DELUXE_PRICE_IDS[b]).map(b => DELUXE_PRICE_IDS[b]);
+  const addonPriceIds  = [...new Set([...priceIds, ...legacyPriceIds])].filter(Boolean);
+  if (addonPriceIds.length === 0) return res.status(400).json({ error: 'Select at least one add-on to continue.' });
+  // Reverse-map price IDs → addonKey for usage tracking
+  const priceIdToKey = {};
+  Object.entries(DELUXE_PRICE_IDS).forEach(([key, id]) => { if (id) priceIdToKey[id] = key; });
+  const addonKeys = addonPriceIds.map(id => priceIdToKey[id] || id);
   try {
-    const stripe = require('stripe')(STRIPE_SECRET_KEY);
-    const user = await db.getUserById(req.user.phone);
+    const stripe  = require('stripe')(STRIPE_SECRET_KEY);
+    const user    = await db.getUserById(req.user.phone);
     const baseUrl = process.env.BASE_URL || 'https://test12.net';
     let customerId = user?.stripeCustomerId;
     if (!customerId) {
@@ -1397,25 +1403,18 @@ app.post('/api/billing/create-checkout-multi', requireAuth, async (req, res) => 
       customerId = customer.id;
       await db.setStripeCustomerId(req.user.phone, customerId);
     }
-    // Monthly subscription line item (recurring)
-    // One-time block charges are added to the first invoice via add_invoice_items
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: 'subscription',
+      mode: 'payment',
       payment_method_types: ['card'],
-      line_items: [{ price: MONTHLY_PRICE_ID, quantity: 1 }],
-      subscription_data: {
-        // One-time charges billed on the first invoice alongside the subscription
-        add_invoice_items: validBlocks.map(b => ({ price: DELUXE_PRICE_IDS[b], quantity: 1 })),
-        metadata: { userId: req.user.phone, blocks: validBlocks.join(',') },
-      },
-      success_url: `${baseUrl}/?subscribed=1&blocks=${validBlocks.join(',')}`,
+      line_items: addonPriceIds.map(id => ({ price: id, quantity: 1 })),
+      success_url: `${baseUrl}/?purchased=1&blocks=${addonKeys.join(',')}`,
       cancel_url:  `${baseUrl}/`,
-      metadata: { userId: req.user.phone, blocks: validBlocks.join(',') },
+      metadata: { userId: req.user.phone, blocks: addonKeys.join(',') },
     });
     res.json({ url: session.url });
   } catch (err) {
-    console.error('Multi checkout error:', err.message);
+    console.error('Checkout error:', err.message, err.raw || '');
     res.status(500).json({ error: err.message });
   }
 });
@@ -1583,31 +1582,51 @@ app.post('/api/billing/subscribe-confirm', requireAuth, async (req, res) => {
 
 // ──────────────────────────────────────────────
 //  Billing — GET /api/billing/prices
-//  Returns live price amounts from Stripe for each plan
+//  Lists ALL active Stripe prices (with products expanded).
+//  Returns:
+//    mandatory: { priceId, name, description, label }   — the monthly subscription
+//    addons:    [{ priceId, addonKey, name, description, label }]  — optional one-time blocks
 // ──────────────────────────────────────────────
 app.get('/api/billing/prices', async (req, res) => {
-  if (!STRIPE_SECRET_KEY) return res.json({ prices: {} });
+  if (!STRIPE_SECRET_KEY) return res.json({ mandatory: null, addons: [] });
   try {
     const stripe = require('stripe')(STRIPE_SECRET_KEY);
-    const ids = {
-      monthly:       MONTHLY_PRICE_ID,
-      'claude-sonnet': DELUXE_PRICE_IDS['claude-sonnet'],
-      xai:           DELUXE_PRICE_IDS['xai'],
-      openai:        DELUXE_PRICE_IDS['openai'],
-    };
-    const entries = await Promise.all(
-      Object.entries(ids).filter(([, id]) => id).map(async ([key, id]) => {
-        const price = await stripe.prices.retrieve(id, { expand: ['product'] });
-        const amount = price.unit_amount / 100;
-        const currency = price.currency.toUpperCase();
-        const label = price.recurring
-          ? `${currency} ${amount.toFixed(2)}/${price.recurring.interval}`
-          : `${currency} ${amount.toFixed(2)}`;
-        const name = price.product?.name || null;
-        return [key, { amount, currency, label, name, recurring: !!price.recurring }];
-      })
-    );
-    res.json({ prices: Object.fromEntries(entries) });
+
+    // Fetch all active prices, expanding the product for name/description
+    const allPrices = await stripe.prices.list({ active: true, limit: 100, expand: ['data.product'] });
+
+    // Reverse-lookup: priceId → addonKey (from env vars)
+    const priceIdToKey = {};
+    Object.entries(DELUXE_PRICE_IDS).forEach(([key, id]) => { if (id) priceIdToKey[id] = key; });
+
+    function formatLabel(price) {
+      const amount = (price.unit_amount || 0) / 100;
+      const cur    = price.currency.toUpperCase();
+      return price.recurring
+        ? `${cur} ${amount.toFixed(2)}/${price.recurring.interval}`
+        : `${cur} ${amount.toFixed(2)}`;
+    }
+
+    const addons = [];
+
+    for (const price of allPrices.data) {
+      // Skip deleted or inactive products, and skip the monthly subscription price
+      if (price.product?.deleted)       continue;
+      if (price.product?.active === false) continue;
+      if (price.id === MONTHLY_PRICE_ID) continue;
+      // Only include one-time (non-recurring) prices as add-ons
+      if (price.recurring) continue;
+
+      addons.push({
+        priceId:     price.id,
+        addonKey:    priceIdToKey[price.id] || price.id,
+        name:        price.product?.name        || price.nickname || price.id,
+        description: price.product?.description || '',
+        label:       formatLabel(price),
+      });
+    }
+
+    res.json({ addons });
   } catch (err) {
     console.error('Stripe prices error:', err.message);
     res.status(500).json({ error: err.message });
@@ -1634,29 +1653,17 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
   try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      // Monthly subscription + optional add-on blocks (create-checkout-multi)
-      if (session.mode === 'subscription' && session.subscription) {
+      // Add-on block payment (mode: 'payment')
+      if (session.payment_status === 'paid' && session.mode === 'payment') {
         const userId = session.metadata?.userId;
         if (userId) {
-          await db.setUserPlan(userId, 'standard', session.subscription);
-          console.log(`Stripe: user ${userId} → Standard subscription ${session.subscription}`);
-          // Record any add-on block purchases included in this checkout
           const blocks = (session.metadata?.blocks || '').split(',').filter(Boolean);
-          for (const addonType of blocks) {
-            if (['claude-sonnet', 'xai', 'openai'].includes(addonType)) {
-              await db.recordAddonPurchase(userId, addonType, session.id);
-              console.log(`Stripe: user ${userId} → addon block purchased: ${addonType} (+${db.ADDON_BLOCK_MINS} min)`);
-            }
+          for (const addonKey of blocks) {
+            await db.recordAddonPurchase(userId, addonKey, session.id);
+            console.log(`Stripe: user ${userId} → addon purchased: ${addonKey} (+${db.ADDON_BLOCK_MINS} min)`);
           }
-        }
-      }
-      // Legacy one-time Deluxe pass (old checkout endpoint)
-      if (session.payment_status === 'paid' && session.mode === 'payment' && session.metadata?.deluxeType) {
-        const userId = session.metadata?.userId;
-        const deluxeType = session.metadata.deluxeType;
-        if (userId && ['claude-sonnet', 'xai', 'openai'].includes(deluxeType)) {
-          await db.recordAddonPurchase(userId, deluxeType, session.id);
-          console.log(`Stripe: user ${userId} → legacy one-time addon: ${deluxeType}`);
+          // Grant deluxe plan access
+          await db.setUserPlan(userId, 'deluxe', session.id);
         }
       }
     }

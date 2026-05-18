@@ -50,6 +50,7 @@
       max-width: 640px;
       text-align: center;
       padding: 2.5rem 1.5rem 1rem;
+      padding-top: 5rem; /* leave room above title for the 3 usage gauges */
       position: relative;
     }
     .header-login-link {
@@ -779,66 +780,21 @@
 
       <hr class="pm-divider">
 
-      <div class="pm-plan">
+      <div class="pm-plan" id="pm-plan-section">
         <div class="pm-label" style="margin-bottom:0.5rem">Plan</div>
-
-        <!-- Mandatory monthly subscription — always included, not selectable -->
-        <div class="pm-plan-item pm-plan-mandatory">
-          <span class="pm-plan-mandatory-badge">Mandatory</span>
-          <div class="pm-plan-label">
-            <div class="pm-plan-name" id="pm-monthly-name">Monthly subscription</div>
-            <div class="pm-plan-desc">Standard access — unlimited voice posts &amp; channels</div>
-          </div>
-          <span class="pm-plan-price" data-price-key="monthly" id="pm-monthly-price">$5/mo</span>
-        </div>
-
-        <div class="pm-label" style="margin:0.6rem 0 0.3rem;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;color:#64748b">Optional add-ons</div>
-        <label class="pm-plan-item">
-          <input type="checkbox" name="block" value="claude-sonnet">
-          <div class="pm-plan-label">
-            <div class="pm-plan-name">3-hour block — Claude Sonnet PTT</div>
-            <div class="pm-plan-desc">Push-to-talk with Claude Sonnet voice agent</div>
-          </div>
-          <span class="pm-plan-price" data-price-key="claude-sonnet">$3</span>
-        </label>
-        <label class="pm-plan-item">
-          <input type="checkbox" name="block" value="xai">
-          <div class="pm-plan-label">
-            <div class="pm-plan-name">3-hour block — xAI Voice agent</div>
-            <div class="pm-plan-desc">Grok voice realtime with always-on mic</div>
-          </div>
-          <span class="pm-plan-price" data-price-key="xai">$3</span>
-        </label>
-        <label class="pm-plan-item">
-          <input type="checkbox" name="block" value="openai">
-          <div class="pm-plan-label">
-            <div class="pm-plan-name">3-hour block — OpenAI Realtime</div>
-            <div class="pm-plan-desc">GPT-4o realtime with always-on mic</div>
-          </div>
-          <span class="pm-plan-price" data-price-key="openai">$3</span>
-        </label>
+        <!-- Populated dynamically from /api/billing/prices -->
+        <div id="pm-plan-loading" style="font-size:0.78rem;color:#64748b;padding:0.5rem 0">Loading plans…</div>
       </div>
 
       <hr class="pm-divider" style="margin-top:0.8rem">
 
       <div class="pm-label" style="margin-bottom:0.4rem">Add-on usage</div>
       <div class="pm-usage" id="pm-usage">
-        <div class="pm-usage-row">
-          <span class="pm-usage-label">Claude Sonnet PTT</span>
-          <span class="pm-usage-val" id="pm-usage-claude-sonnet">—</span>
-        </div>
-        <div class="pm-usage-row">
-          <span class="pm-usage-label">xAI Voice agent</span>
-          <span class="pm-usage-val" id="pm-usage-xai">—</span>
-        </div>
-        <div class="pm-usage-row">
-          <span class="pm-usage-label">OpenAI Realtime</span>
-          <span class="pm-usage-val" id="pm-usage-openai">—</span>
-        </div>
+        <!-- Populated dynamically once add-ons are loaded -->
       </div>
 
       <div id="pm-msg" class="pm-msg" style="display:none"></div>
-      <button class="pm-buy-btn" id="pm-buy-btn">Subscribe</button>
+      <button class="pm-buy-btn" id="pm-buy-btn">Buy selected add-ons</button>
       <p class="pm-stripe-note">🔒 Payment processed securely by Stripe. Card details are never stored on our servers.</p>
     </div>
   </div>
@@ -3232,42 +3188,70 @@ async function _applySession(d) {
   const msgEl    = document.getElementById('pm-msg');
   const checks   = () => Array.from(document.querySelectorAll('.pm-plan-item input[type=checkbox]'));
 
+  function fmtUsage(u) {
+    if (!u || u.sessionCount === 0) return '0 min';
+    const mins = u.totalMins;
+    return mins >= 60
+      ? `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m (${u.sessionCount} session${u.sessionCount > 1 ? 's' : ''})`
+      : `${mins} min (${u.sessionCount} session${u.sessionCount > 1 ? 's' : ''})`;
+  }
+
+  function renderPlanSection(addons, usage) {
+    const planSection = document.getElementById('pm-plan-section');
+    if (!planSection) return;
+
+    let html = '<div class="pm-label" style="margin-bottom:0.5rem">Select add-ons</div>';
+
+    // Add-on checkboxes from Stripe
+    if (addons.length > 0) {
+      addons.forEach(addon => {
+        html += `
+          <label class="pm-plan-item">
+            <input type="checkbox" name="block" value="${addon.priceId}" data-addon-key="${addon.addonKey || addon.priceId}">
+            <div class="pm-plan-label">
+              <div class="pm-plan-name">${addon.name}</div>
+              ${addon.description ? `<div class="pm-plan-desc">${addon.description}</div>` : ''}
+            </div>
+            <span class="pm-plan-price">${addon.label}</span>
+          </label>`;
+      });
+    }
+
+    planSection.innerHTML = html;
+
+    // Re-wire checkbox listeners after re-render
+    checks().forEach(cb => cb.addEventListener('change', () => { msgEl.style.display = 'none'; }));
+
+    // Render usage rows for each add-on
+    const usageEl = document.getElementById('pm-usage');
+    if (usageEl && usage) {
+      usageEl.innerHTML = addons.map(addon => {
+        const key = addon.addonKey || addon.priceId;
+        return `<div class="pm-usage-row">
+          <span class="pm-usage-label">${addon.name}</span>
+          <span class="pm-usage-val" id="pm-usage-${key}">${fmtUsage(usage[key])}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+
   async function openProfileModal() {
     document.getElementById('pm-username').value = currentUser?.displayName || currentUser?.phone || '';
     overlay.style.display = 'flex';
     requestAnimationFrame(() => overlay.classList.remove('hidden'));
-    // Fetch live prices from Stripe and add-on usage in parallel
+
+    // Fetch prices and usage in parallel
     const [pricesRes, usageRes] = await Promise.allSettled([
       fetch('/api/billing/prices'),
       fetch('/api/addon/usage', { headers: authHeaders() }),
     ]);
 
-    if (pricesRes.status === 'fulfilled' && pricesRes.value.ok) {
-      const { prices } = await pricesRes.value.json();
-      Object.entries(prices).forEach(([key, p]) => {
-        const priceEl = document.querySelector(`[data-price-key="${key}"]`);
-        if (priceEl) priceEl.textContent = p.label;
-        if (key === 'monthly' && p.name) {
-          const nameEl = document.getElementById('pm-monthly-name');
-          if (nameEl) nameEl.textContent = p.name;
-        }
-      });
-    }
+    const pricesData = (pricesRes.status === 'fulfilled' && pricesRes.value.ok)
+      ? await pricesRes.value.json() : { addons: [] };
+    const usageData  = (usageRes.status  === 'fulfilled' && usageRes.value.ok)
+      ? (await usageRes.value.json()).usage : {};
 
-    if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
-      const { usage } = await usageRes.value.json();
-      const fmt = (u) => {
-        if (!u || u.sessionCount === 0) return '0 min';
-        const mins = u.totalMins;
-        return mins >= 60
-          ? `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m (${u.sessionCount} session${u.sessionCount > 1 ? 's' : ''})`
-          : `${mins} min (${u.sessionCount} session${u.sessionCount > 1 ? 's' : ''})`;
-      };
-      ['claude-sonnet', 'xai', 'openai'].forEach(key => {
-        const el = document.getElementById(`pm-usage-${key}`);
-        if (el) el.textContent = fmt(usage[key]);
-      });
-    }
+    renderPlanSection(pricesData.addons || [], usageData);
   }
   function closeProfileModal() {
     overlay.classList.add('hidden');
@@ -3278,32 +3262,31 @@ async function _applySession(d) {
   if (closeBtn) closeBtn.addEventListener('click', closeProfileModal);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeProfileModal(); });
 
-  // Update button label when checkboxes change
-  checks().forEach(cb => {
-    cb.addEventListener('change', () => { msgEl.style.display = 'none'; });
-  });
-
-  // Purchase — redirect to Stripe Checkout (monthly subscription + any selected blocks)
+  // Purchase — redirect to Stripe Checkout (monthly subscription + any selected add-ons)
   buyBtn.addEventListener('click', async () => {
-    const selectedBlocks = checks().filter(c => c.checked).map(c => c.value);
+    // checkbox values are now Stripe price IDs
+    const selectedPriceIds = checks().filter(c => c.checked).map(c => c.value);
     buyBtn.disabled = true;
     buyBtn.textContent = 'Redirecting to Stripe…';
     msgEl.style.display = 'none';
     try {
       const r = await fetch('/api/billing/create-checkout-multi', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ blocks: selectedBlocks }),
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ priceIds: selectedPriceIds }),
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Payment setup failed');
+      // Safe JSON parse — server may return HTML on unexpected errors
+      const text = await r.text();
+      let d;
+      try { d = JSON.parse(text); } catch { throw new Error(`Server error ${r.status}: ${text.substring(0, 120)}`); }
+      if (!r.ok) throw new Error(d.error || `Payment setup failed (${r.status})`);
       window.location.href = d.url;
     } catch (err) {
       msgEl.textContent = err.message;
       msgEl.className = 'pm-msg error';
       msgEl.style.display = 'block';
       buyBtn.disabled = false;
-      buyBtn.textContent = 'Subscribe';
+      buyBtn.textContent = 'Buy selected add-ons';
     }
   });
 

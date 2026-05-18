@@ -10,10 +10,14 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # ── App stage ──────────────────────────────────────────────────────────────────
-COPY app.js      ./
-COPY lambda.js   ./
-COPY db.js       ./
-COPY public/     ./public/
+COPY app.js        ./
+COPY lambda.js     ./
+COPY db.js         ./
+COPY mcp-tools.js  ./
+COPY ws-broadcast.js ./
+COPY ws-handler.js ./
+COPY web.js        ./
+COPY public/       ./public/
 
 # Lambda handler: file.export  →  lambda.handler
 CMD ["lambda.handler"]
