@@ -3290,46 +3290,142 @@ async function _applySession(d) {
     cb.addEventListener('change', () => { msgEl.style.display = 'none'; });
   });
 
-  // Card number formatting (groups of 4)
-  const cardNumEl = document.getElementById('pm-card-number');
-  if (cardNumEl) {
-    cardNumEl.addEventListener('input', () => {
-      let v = cardNumEl.value.replace(/\D/g, '').substring(0, 16);
-      cardNumEl.value = v.replace(/(.{4})/g, '$1 ').trim();
+  // ── Stripe Elements setup ──
+  let _stripe = null;
+  let _cardElement = null;
+  const cardWrap   = document.getElementById('pm-stripe-card');
+  const cardErrors = document.getElementById('pm-card-errors');
+
+  async function ensureStripeElements() {
+    if (_cardElement) return; // already mounted
+    // Load publishable key from server
+    const cfg = await fetch('/api/billing/config').then(r => r.json()).catch(() => ({}));
+    const pk  = cfg.publishableKey;
+    if (!pk || pk.includes('REPLACE')) {
+      cardWrap.innerHTML = '<span style="font-size:0.78rem;color:#f87171">⚠️ Stripe publishable key not configured.<br>Set STRIPE_PUBLIC_KEY in .env</span>';
+      return;
+    }
+    // Stripe.js may still be loading (async script tag)
+    if (typeof Stripe === 'undefined') {
+      await new Promise(resolve => { const t = setInterval(() => { if (typeof Stripe !== 'undefined') { clearInterval(t); resolve(); } }, 100); });
+    }
+    _stripe = Stripe(pk);
+    const elements = _stripe.elements({
+      appearance: {
+        theme: 'night',
+        variables: {
+          colorPrimary: '#1595b2',
+          colorBackground: '#0f172a',
+          colorText: '#e2e8f0',
+          colorDanger: '#f87171',
+          fontFamily: 'system-ui, sans-serif',
+          borderRadius: '8px',
+        },
+      },
+    });
+    _cardElement = elements.create('card', {
+      style: {
+        base: { fontSize: '14px', color: '#e2e8f0', '::placeholder': { color: '#475569' }, iconColor: '#1595b2' },
+        invalid: { color: '#f87171', iconColor: '#f87171' },
+      },
+      hidePostalCode: true,
+    });
+    _cardElement.mount('#pm-stripe-card');
+    _cardElement.on('change', e => {
+      if (e.error) {
+        cardErrors.textContent = e.error.message;
+        cardErrors.style.display = 'block';
+      } else {
+        cardErrors.style.display = 'none';
+      }
     });
   }
 
-  // Expiry formatting (MM/YY)
-  const expiryEl = document.getElementById('pm-card-expiry');
-  if (expiryEl) {
-    expiryEl.addEventListener('input', () => {
-      let v = expiryEl.value.replace(/\D/g, '').substring(0, 4);
-      if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
-      expiryEl.value = v;
-    });
-  }
+  // Mount Elements the first time the modal opens
+  const _origOpenProfileModal = openProfileModal;
+  openProfileModal = async function() {
+    await _origOpenProfileModal();
+    ensureStripeElements();
+  };
 
-  // Purchase — always includes monthly subscription + any checked blocks
+  // Purchase — subscribe directly via Stripe Elements (no redirect)
   buyBtn.addEventListener('click', async () => {
-    const selectedBlocks = checks().filter(c => c.checked).map(c => c.value);
-    buyBtn.disabled = true;
-    buyBtn.textContent = 'Redirecting to Stripe…';
-    msgEl.style.display = 'none';
-    try {
+    if (!_stripe || !_cardElement) {
+      // Fallback: Stripe not loaded — use Checkout redirect
+      const selectedBlocks = checks().filter(c => c.checked).map(c => c.value);
+      buyBtn.disabled = true; buyBtn.textContent = 'Redirecting to Stripe…';
       const r = await fetch('/api/billing/create-checkout-multi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ blocks: selectedBlocks }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Payment setup failed');
-      window.location.href = d.url;
+      if (r.ok) { window.location.href = d.url; return; }
+      msgEl.textContent = d.error || 'Payment setup failed';
+      msgEl.className = 'pm-msg error'; msgEl.style.display = 'block';
+      buyBtn.disabled = false; buyBtn.textContent = 'Subscribe';
+      return;
+    }
+
+    const selectedBlocks = checks().filter(c => c.checked).map(c => c.value);
+    buyBtn.disabled = true; buyBtn.textContent = 'Processing…'; msgEl.style.display = 'none';
+
+    try {
+      // 1. Tokenise the card into a PaymentMethod
+      const username = document.getElementById('pm-username')?.value || '';
+      const { paymentMethod, error: pmError } = await _stripe.createPaymentMethod({
+        type: 'card',
+        card: _cardElement,
+        billing_details: { name: username },
+      });
+      if (pmError) throw new Error(pmError.message);
+
+      // 2. Send to backend to create subscription
+      const r = await fetch('/api/billing/subscribe-direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ paymentMethodId: paymentMethod.id, blocks: selectedBlocks }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Payment failed');
+
+      if (d.subscribed) {
+        // Success — no 3DS needed
+        msgEl.textContent = '✓ Subscribed successfully!';
+        msgEl.className = 'pm-msg'; msgEl.style.display = 'block';
+        msgEl.style.color = '#34d399';
+        buyBtn.textContent = 'Subscribed ✓';
+        refreshVAMode();
+        setTimeout(() => { msgEl.style.display = 'none'; buyBtn.textContent = 'Subscribe'; buyBtn.disabled = false; }, 4000);
+        return;
+      }
+
+      if (d.requiresAction) {
+        // 3DS authentication required
+        buyBtn.textContent = 'Complete authentication…';
+        const { error: confirmError } = await _stripe.confirmCardPayment(d.clientSecret);
+        if (confirmError) throw new Error(confirmError.message);
+        // Confirm activation server-side
+        const confirmR = await fetch('/api/billing/subscribe-confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ subscriptionId: d.subscriptionId, blocks: selectedBlocks }),
+        });
+        const confirmD = await confirmR.json();
+        if (!confirmR.ok) throw new Error(confirmD.error || 'Confirmation failed');
+        msgEl.textContent = '✓ Subscribed successfully!';
+        msgEl.className = 'pm-msg'; msgEl.style.display = 'block';
+        msgEl.style.color = '#34d399';
+        buyBtn.textContent = 'Subscribed ✓';
+        refreshVAMode();
+        setTimeout(() => { msgEl.style.display = 'none'; buyBtn.textContent = 'Subscribe'; buyBtn.disabled = false; }, 4000);
+        return;
+      }
+
+      throw new Error('Unexpected response from server');
     } catch (err) {
       msgEl.textContent = err.message;
-      msgEl.className = 'pm-msg error';
-      msgEl.style.display = 'block';
-      buyBtn.disabled = false;
-      buyBtn.textContent = 'Subscribe';
+      msgEl.className = 'pm-msg error'; msgEl.style.display = 'block';
+      buyBtn.disabled = false; buyBtn.textContent = 'Subscribe';
     }
   });
 
