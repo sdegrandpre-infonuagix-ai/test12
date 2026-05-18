@@ -1727,6 +1727,7 @@ app.delete('/api/aliases/:username', requireAuth, async (req, res) => {
 
 // ──────────────────────────────────────────────
 //  Admin — GET /api/admin/users — list all registered users
+
 app.get('/api/admin/users', async (req, res) => {
   const adminKey = req.headers['x-admin-key'];
   if (!adminKey || adminKey !== process.env.ADMIN_SECRET_KEY) return res.status(403).json({ error: 'Forbidden' });

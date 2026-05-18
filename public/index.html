@@ -1109,6 +1109,8 @@ function showLoginModal() {
   if (stepReveal) stepReveal.style.display = 'none';
   if (stepOtp) stepOtp.style.display = 'none';
   if (loginErr) loginErr.style.display = 'none';
+  // Always re-enable social buttons so they work after logout
+  ['btn-google', 'btn-apple'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
   // Populate datalist and default USERID to most recently used
   const history = getUidHistory();
   const datalist = document.getElementById('uid-datalist');
@@ -2062,12 +2064,13 @@ function refreshVAMode() {
     sessionStorage.setItem('welcomeSpoken', '1');
     const name = currentUser?.displayName ? `, ${currentUser.displayName}` : '';
     const welcome =
-      `Test 1 2 — The Vocal Social Network. `
-      + `Welcome${name}! I'm your Haiku assistant. You can say: `
-      + `create a private chatroom, join a private chatroom, `
-      + `join the public chatroom and post a message, `
-      + `change agent to Sonnet 4.6, change agent to xAI Voice Agent, `
-      + `change agent to OpenAI Realtime, or change agent to Haiku 4.5.`;
+      `Test 1 2 — The Vocal Social Network. Welcome${name}! `
+      + `Manage a chatroom vocally. Tap the button, speak naturally — the agent can join the public channel, `
+      + `create a private channel, join a private channel with its id, `
+      + `invite a friend through SMS to create a profile on Test 1 2 and join a private channel, `
+      + `read posts, create posts, `
+      + `change agent to Sonnet, change agent to xAI Voice Agent or change agent to OpenAI Realtime agent. `
+      + `All agents support multiple languages!`;
     setTimeout(() => ptSpeak(welcome), 800);
   }
 }

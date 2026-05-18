@@ -989,7 +989,11 @@ async function listUsers() {
     items = items.concat(r.Items || []);
     lastKey = r.LastEvaluatedKey;
   } while (lastKey);
-  return items.map(u => ({ id: u.phone || u.pk, displayName: u.displayName || '', plan: u.plan || 'standard', createdAt: u.createdAt || '' }));
+  return items.map(u => {
+    const id = u.phone || u.pk?.replace('USER#', '') || '';
+    const type = id.includes('@') ? 'email' : /^\+?\d{7,}$/.test(id) ? 'phone' : 'apple';
+    return { id, type, displayName: u.displayName || '', plan: u.plan || 'standard', createdAt: u.createdAt || '' };
+  });
 }
 
 module.exports = {
@@ -1000,6 +1004,7 @@ module.exports = {
   // Auth
   createOTP, verifyAndConsumeOTP,
   createSession, getSession, deleteSession,
+  _rawDoc: () => doc,
   getOrCreateUser, getUserById, listUsers, updateUserProfile, autoRegister, pinLogin,
   addChannelMember, getUserChannelIds, isChannelMember,
   // Plan & Billing
