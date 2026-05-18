@@ -629,20 +629,11 @@
     <div class="profile-badge" id="profile-badge" style="display:none">
       Logged in as <strong id="profile-name"></strong>
       <span id="plan-badge-el" class="plan-badge standard" title="Your current plan">Standard</span>
-      <button id="logout-btn">Sign out</button>
-      <button id="show-pwd-btn" title="Show my 2-digit password" onclick="(function(){
-        const m=document.cookie.match(/test12_pin=([^;]+)/);
-        const el=document.getElementById('pwd-reveal');
-        if(!el)return;
-        if(m){el.textContent='🔑 '+decodeURIComponent(m[1]);el.style.display='inline';}
-        else{el.textContent='No password saved';el.style.display='inline';}
-        clearTimeout(window._pwdTimer);
-        window._pwdTimer=setTimeout(()=>el.style.display='none',8000);
-      })()" style="background:rgba(21,149,178,0.15);border:1px solid rgba(21,149,178,0.4);color:#1595b2;font-size:0.75rem;padding:2px 8px;border-radius:6px;cursor:pointer;font-family:inherit;">🔑</button>
-      <span id="pwd-reveal" style="display:none;font-weight:900;color:#22c55e;letter-spacing:0.2em;font-size:0.95rem;margin-left:4px"></span>
     </div>
     <!-- Log in link — shown when not logged in -->
     <a id="header-login-link" class="header-login-link" href="#" onclick="event.preventDefault();showLoginModal();">Log in</a>
+    <!-- Sign out button — shown when logged in, top right -->
+    <button id="logout-btn" class="header-login-link" style="display:none;background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);color:#ef4444;">Sign out</button>
     <p>
       Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, reply to a post, reply to a reply, create private channels and invite a friends through SMS to a private channel. I support 25 languages!
     </p>
@@ -1137,9 +1128,10 @@ function onLoggedIn() {
   const label = currentUser.displayName || currentUser.phone;
   profileName.textContent = label;
   profileBadge.style.display = 'flex';
-  // Hide the Log in link when authenticated
+  // Swap Log in link → Sign out button
   const hll = document.getElementById('header-login-link');
   if (hll) hll.style.display = 'none';
+  if (logoutBtn) logoutBtn.style.display = '';
   hideLoginModal();
   if (currentUser.phone) saveProfileToHistory(currentUser.phone, currentUser.displayName);
   // Save USERID to datalist history
