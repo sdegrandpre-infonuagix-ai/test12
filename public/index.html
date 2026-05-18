@@ -1854,19 +1854,41 @@ clearBtn.addEventListener('click', () => { logsEl.innerHTML = ''; });
 let ptRecognizer = null;
 let ptListening = false;
 
-function ptSpeak(text) {
+function _browserSpeak(text) {
   if (!text || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US'; u.rate = 1.05; u.pitch = 1;
   const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    window.speechSynthesis.speak(u);
-  } else {
+  if (voices.length > 0) { window.speechSynthesis.speak(u); }
+  else {
     window.speechSynthesis.addEventListener('voiceschanged', function once() {
       window.speechSynthesis.removeEventListener('voiceschanged', once);
       window.speechSynthesis.speak(u);
     });
+  }
+}
+
+let _ttsAudio = null;
+async function ptSpeak(text) {
+  if (!text) return;
+  if (_ttsAudio) { try { _ttsAudio.pause(); } catch(_){} _ttsAudio = null; }
+  if (!currentUser) { _browserSpeak(text); return; }
+  try {
+    const r = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ text })
+    });
+    if (!r.ok) { _browserSpeak(text); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    _ttsAudio = new Audio(url);
+    await _ttsAudio.play();
+    _ttsAudio.onended = () => { URL.revokeObjectURL(url); _ttsAudio = null; };
+  } catch(e) {
+    console.warn('Grok TTS error, falling back to browser:', e.message);
+    _browserSpeak(text);
   }
 }
 
@@ -2057,6 +2079,7 @@ function _stopUsageTimer() {
   if (_addonUsageTimer) { clearInterval(_addonUsageTimer); _addonUsageTimer = null; }
 }
 
+let _welcomeSpoken = false;
 function refreshVAMode() {
   if (currentPlan === 'deluxe') {
     if (currentDeluxeType === 'xai')          VA_MODE = 'deluxe-xai';
@@ -2064,9 +2087,20 @@ function refreshVAMode() {
     else if (currentDeluxeType === 'openai')  VA_MODE = 'deluxe-openai';
     else VA_MODE = 'deluxe-xai';
   } else {
-    VA_MODE = 'llm'; // Standard: Claude Haiku
+    VA_MODE = 'llm'; // Grok3 STT/TTS + Claude Haiku
   }
   updateAgentUI();
+  if (!_welcomeSpoken && VA_MODE === 'llm') {
+    _welcomeSpoken = true;
+    const name = currentUser?.displayName ? `, ${currentUser.displayName}` : '';
+    const welcome =
+      `Welcome to Test12${name}! I'm your Haiku assistant. You can say: `
+      + `create a private chatroom, join a private chatroom, `
+      + `join the public chatroom and post a message, `
+      + `change agent to Sonnet 4.6, change agent to xAI Voice Agent, `
+      + `change agent to OpenAI Realtime, or change agent to Haiku 4.5.`;
+    setTimeout(() => ptSpeak(welcome), 800);
+  }
 }
 
 // ── MCP tools schema (shared by both Grok and Claude dispatchers) ──
@@ -2092,7 +2126,8 @@ async function dispatchWithClaude(transcript) {
   const systemPrompt =
     `You are a concise voice assistant for Test12, a social voice-posting platform. `
     + `The user's username is "${author}". Active channel: "${activeChannelId || 'public'}". `
-    + `Use tools to fulfill the request. Reply in 1-2 SHORT sentences — the reply will be spoken aloud. No markdown.`;
+    + `Use tools to fulfill the request. Reply in 1-2 SHORT sentences — the reply will be spoken aloud. No markdown. `
+    + `Available voice agent options the user can switch to: Haiku 4.5 (default), Sonnet 4.6, xAI Voice Agent, OpenAI Realtime.`;
 
   // Retry up to 3× on 529 (overloaded) or 503
   let resp, lastStatus;
@@ -2289,7 +2324,21 @@ function resolveToolForActiveChannel(name, input) {
 
 // ── Intent → MCP tool dispatcher ──
 async function dispatchIntent(transcript) {
-  log('text', 'You: <b>' + transcript + '</b>');
+  // ── Agent-switching commands (handled before API calls) ──
+  const tl = transcript.toLowerCase();
+  const agentSwitch =
+    /\b(switch|change|use|set).{0,15}(haiku|4\.5)\b/.test(tl)     ? 'llm'          :
+    /\b(switch|change|use|set).{0,15}(sonnet|4\.6)\b/.test(tl)    ? 'deluxe-claude' :
+    /\b(switch|change|use|set).{0,15}(xai|grok.{0,6}voice)\b/.test(tl) ? 'deluxe-xai'   :
+    /\b(switch|change|use|set).{0,15}(openai|realtime)\b/.test(tl) ? 'deluxe-openai' : null;
+  if (agentSwitch) {
+    VA_MODE = agentSwitch;
+    updateAgentUI();
+    const label = { llm:'Haiku 4.5', 'deluxe-claude':'Sonnet 4.6', 'deluxe-xai':'xAI Voice Agent', 'deluxe-openai':'OpenAI Realtime' }[agentSwitch];
+    await ptSpeak(`Switched to ${label}.`);
+    return;
+  }
+
   setStatus('Thinking…'); setOrb('connecting');
 
   try {
@@ -2383,12 +2432,12 @@ function updateAgentUI() {
     const modeLabel = VA_MODE === 'deluxe-xai' ? 'xAI Grok-3 realtime voice' : 'OpenAI gpt-realtime-2 voice';
     log('ws', `<b>Deluxe mode</b> — ${modeLabel} with MCP tools`);
   } else {
-    const label = VA_MODE === 'deluxe-claude' ? '🧠 Tap to Speak (Sonnet)' : '🤖 Tap to Speak (AI)';
+    const label = VA_MODE === 'deluxe-claude' ? '🧠 Tap to Speak (Sonnet)' : '🎙️ Tap to speak';
     connectBtn.textContent = label;
     disconnectBtn.style.display = 'none';
     setStatus('Tap to speak');
-    const modeLabel = VA_MODE === 'deluxe-claude' ? 'Claude Sonnet 4 + Browser STT/TTS' : 'Claude Haiku + Browser STT/TTS';
-    log('ws', `<b>${VA_MODE === 'deluxe-claude' ? 'Deluxe' : 'Standard'} mode</b> — ${modeLabel}`);
+    const modeLabel = VA_MODE === 'deluxe-claude' ? 'Grok3 STT/TTS + Claude Sonnet 4.6' : 'Grok3 STT/TTS + Claude Haiku 4.5';
+    log('ws', `<b>${VA_MODE === 'deluxe-claude' ? 'Sonnet' : 'Haiku'} mode</b> — ${modeLabel}`);
   }
 }
 
@@ -2608,43 +2657,69 @@ function updateAgentUI() {
     }
   });
 
-  // ── PTT click — handles Standard (Haiku) and Deluxe Claude (Sonnet) ──
-  connectBtn.addEventListener('click', () => {
+  // ── PTT click — Grok3 STT (MediaRecorder) + Haiku/Sonnet ──
+  let _ptMediaRecorder = null, _ptChunks = [];
+  connectBtn.addEventListener('click', async () => {
     if (VA_MODE !== 'llm' && VA_MODE !== 'deluxe-claude') return;
+
+    // Second tap → stop recording
+    if (ptListening && _ptMediaRecorder?.state === 'recording') {
+      _ptMediaRecorder.stop(); return;
+    }
     if (ptListening) return;
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { ptSpeak('Speech recognition not supported. Use Chrome.'); log('error','SpeechRecognition not supported.'); return; }
-    ptRecognizer = new SR();
-    ptRecognizer.lang = navigator.language || 'en-US';
-    ptRecognizer.interimResults = false; ptRecognizer.maxAlternatives = 1;
-    let sttRetries = 0;
-    ptRecognizer.onerror = (e) => {
-      if (e.error === 'network' && sttRetries < 3) {
-        sttRetries++;
-        log('agent', `STT network error — retrying (${sttRetries}/3)…`);
-        setTimeout(() => { try { ptRecognizer.start(); } catch(_) {} }, 1000);
-      } else if (e.error === 'no-speech') {
-        // silent — user just didn't speak
-        setStatus('Tap to speak'); connectBtn.disabled = false; connectBtn.textContent = '🎙️ Tap to speak';
-      } else {
-        log('error', 'STT error: ' + e.error);
-        setStatus('Tap to speak'); connectBtn.disabled = false; connectBtn.textContent = '🎙️ Tap to speak';
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(e) {
+      log('error', 'Microphone access denied: ' + e.message);
+      ptSpeak('Please allow microphone access.'); return;
+    }
+
+    const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+    _ptChunks = [];
+    _ptMediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+
+    _ptMediaRecorder.ondataavailable = e => { if (e.data.size > 0) _ptChunks.push(e.data); };
+
+    _ptMediaRecorder.onstart = () => {
+      ptListening = true; setOrb('listening'); setStatus('Listening… tap to stop');
+      connectBtn.textContent = '🔴 Tap to stop'; connectBtn.disabled = false;
+    };
+
+    _ptMediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      ptListening = false; setOrb('connecting'); setStatus('Processing…');
+      connectBtn.textContent = '⏳ Processing…'; connectBtn.disabled = true;
+
+      const blob = new Blob(_ptChunks, { type: _ptMediaRecorder.mimeType || 'audio/webm' });
+      const ext = (_ptMediaRecorder.mimeType || '').includes('ogg') ? 'ogg' : 'webm';
+      const formData = new FormData();
+      formData.append('file', blob, `audio.${ext}`);
+
+      try {
+        const r = await fetch('/api/stt', { method: 'POST', headers: authHeaders(), body: formData });
+        if (r.ok) {
+          const { text } = await r.json();
+          if (text?.trim()) {
+            log('text', 'You: <b>' + text.trim() + '</b>');
+            await dispatchIntent(text.trim());
+          } else {
+            setStatus('Tap to speak'); setOrb('');
+          }
+        } else {
+          log('error', 'STT failed: ' + r.status);
+          setStatus('Tap to speak'); setOrb('');
+        }
+      } catch(e) {
+        log('error', 'STT error: ' + e.message);
+        setStatus('Tap to speak'); setOrb('');
+      } finally {
+        connectBtn.disabled = false; updateAgentUI();
       }
     };
-    ptRecognizer.onstart = () => {
-      sttRetries = 0; // reset retry count on successful start
-      ptListening=true; setOrb('listening'); setStatus('Listening…');
-      connectBtn.textContent='🔴 Listening…'; connectBtn.disabled=true;
-    };
-    ptRecognizer.onresult = (e) => {
-      const t = e.results[0][0].transcript.trim();
-      if (t) dispatchIntent(t);
-    };
-    ptRecognizer.onend = () => {
-      ptListening = false; setOrb(''); setStatus('Tap to speak');
-      updateAgentUI(); connectBtn.disabled = false; connectBtn.textContent = '🎙️ Tap to speak';
-    };
-    ptRecognizer.start();
+
+    _ptMediaRecorder.start();
   });
 
   // Initialise UI once DOM is ready (mode set after login via refreshVAMode)

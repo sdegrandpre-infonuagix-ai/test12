@@ -109,7 +109,7 @@ app.post('/api/stt', requireAuth, upload.single('file'), async (req, res) => {
 //  TTS Proxy — POST /api/tts
 //  Accepts { text, voice_id }, returns MP3 audio
 // ──────────────────────────────────────────────
-app.post('/api/tts', requireDeluxe, async (req, res) => {
+app.post('/api/tts', requireAuth, async (req, res) => {
   try {
     const { text, voice_id = 'eve', language = 'en' } = req.body;
 
