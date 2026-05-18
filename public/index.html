@@ -1119,6 +1119,7 @@ if (logoutBtn) logoutBtn.addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
   clearAuthSession();
   profileBadge.style.display = 'none';
+  if (logoutBtn) logoutBtn.style.display = 'none';
   const hll = document.getElementById('header-login-link');
   if (hll) hll.style.display = '';
   showLoginModal();
