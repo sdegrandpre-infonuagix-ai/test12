@@ -282,7 +282,7 @@ const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I,O,0,1 to avoid conf
 function generateUsername() {
   const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
   let suffix = '';
-  for (let i = 0; i < 6; i++) suffix += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
+  for (let i = 0; i < 4; i++) suffix += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
   return animal + suffix;
 }
 

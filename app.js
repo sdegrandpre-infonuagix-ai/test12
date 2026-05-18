@@ -734,6 +734,14 @@ async function requireAuth(req, res, next) {
 //  Auth Routes
 // ──────────────────────────────────────────────
 
+// GET /api/config/client — public config for frontend (no secrets)
+app.get('/api/config/client', (_req, res) => {
+  res.json({
+    googleClientId: GOOGLE_CLIENT_ID || null,
+    appleServiceId: process.env.APPLE_SERVICE_ID || null,
+  });
+});
+
 // POST /api/auth/auto-register  — passwordless, USERID + GPS Plus Code
 app.post('/api/auth/auto-register', async (req, res) => {
   if (!db.isReady()) return res.status(503).json({ error: 'Database not connected' });

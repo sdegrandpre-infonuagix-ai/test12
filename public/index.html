@@ -310,56 +310,102 @@
       color: #1595b2; text-decoration: none; font-weight: 600;
     }
     .powered-footer a:hover { text-decoration: underline; }
-    /* ── Login Modal ── */
+    /* ── Login Modal — ChatGPT-style ── */
     #login-overlay {
       position: fixed; inset: 0; z-index: 9999;
-      background: rgba(5,8,16,0.92);
-      -webkit-backdrop-filter: blur(12px);
-      backdrop-filter: blur(12px);
+      background: rgba(0,0,0,0.7);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
       display: flex; align-items: center; justify-content: center;
-      transition: opacity 0.3s;
+      transition: opacity 0.25s;
     }
     #login-overlay.hidden { opacity: 0; pointer-events: none; }
     .login-box {
-      background: rgba(15,23,42,0.95);
-      border: 1px solid rgba(21,149,178,0.35);
-      border-radius: 20px;
-      padding: 2.5rem 2rem;
-      width: 100%; max-width: 380px;
-      margin: 1rem;
-      display: flex; flex-direction: column; gap: 1.25rem;
+      background: #fff; border-radius: 18px;
+      padding: 2.5rem 2.25rem 2rem;
+      width: 100%; max-width: 400px; margin: 1rem;
+      display: flex; flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.4);
     }
+    .social-btn {
+      display:flex; align-items:center; justify-content:center; gap:0.65rem;
+      width:100%; padding:13px 16px; margin-bottom:0.65rem;
+      border-radius:10px; font-size:0.95rem; font-weight:600;
+      font-family:inherit; cursor:pointer; transition:background 0.15s,box-shadow 0.15s;
+      border:1.5px solid #e5e7eb; background:#fff; color:#0f172a;
+    }
+    .social-btn:hover { background:#f8fafc; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+    .social-btn svg { width:20px; height:20px; flex-shrink:0; }
+    .social-btn.phone-btn { background:#0f172a; color:#fff; border-color:#0f172a; }
+    .social-btn.phone-btn:hover { background:#1e293b; }
+    .login-back {
+      background:none; border:none; color:#64748b; font-size:0.85rem;
+      cursor:pointer; font-family:inherit; padding:0.5rem 0; margin-top:0.25rem;
+    }
+    .login-back:hover { color:#374151; }
+    .login-box-logo {
+      display: flex; justify-content: center; margin-bottom: 1.5rem;
+    }
+    .login-box-logo svg { width: 40px; height: 40px; }
     .login-box h2 {
-      font-size: 1.2rem; font-weight: 700; color: #1595b2;
-      text-align: center;
+      font-size: 1.65rem; font-weight: 700; color: #0f172a;
+      text-align: center; margin-bottom: 0.35rem; letter-spacing: -0.02em;
+    }
+    .login-box-subtitle {
+      font-size: 0.88rem; color: #64748b; text-align: center;
+      margin-bottom: 1.75rem; line-height: 1.5;
     }
     .login-box p.hint {
       font-size: 0.82rem; color: #64748b; text-align: center; line-height: 1.5;
     }
-    /* Each step is a flex column so elements are evenly spaced */
+    .login-field-label {
+      font-size: 0.75rem; font-weight: 600; color: #374151;
+      letter-spacing: 0.04em; margin-bottom: 0.3rem;
+    }
+    .login-field-wrap { margin-bottom: 1rem; }
     #login-step-phone, #login-step-otp, #login-step-name {
       display: flex; flex-direction: column; gap: 0.9rem;
     }
-    #login-step-phone hr { border: none; border-top: 1px solid rgba(21,149,178,0.15); margin: 0; }
+    #login-step-phone hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.5rem 0; }
     .login-input {
-      width: 100%; padding: 12px 14px;
-      background: rgba(21,149,178,0.08);
-      border: 1px solid rgba(21,149,178,0.3);
+      width: 100%; padding: 13px 14px;
+      background: #f9fafb;
+      border: 1.5px solid #e5e7eb;
       border-radius: 10px;
-      color: #e2e8f0; font-size: 1rem; font-family: inherit;
-      outline: none; transition: border-color 0.2s;
+      color: #0f172a; font-size: 1rem; font-family: inherit;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+      box-sizing: border-box;
     }
-    .login-input:focus { border-color: #1595b2; }
+    .login-input:focus {
+      border-color: #1595b2;
+      box-shadow: 0 0 0 3px rgba(21,149,178,0.12);
+      background: #fff;
+    }
     .login-btn {
       width: 100%; padding: 13px;
-      background: #1595b2; color: #fff;
+      background: #0f172a; color: #fff;
       border: none; border-radius: 10px;
-      font-size: 1rem; font-weight: 700; font-family: inherit;
-      cursor: pointer; transition: opacity 0.15s;
+      font-size: 0.97rem; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: background 0.15s, transform 0.1s;
+      margin-top: 0.25rem;
     }
-    .login-btn:hover { opacity: 0.88; }
+    .login-btn:hover { background: #1e293b; }
+    .login-btn:active { transform: scale(0.99); }
     .login-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .login-error { color: #f87171; font-size: 0.82rem; text-align: center; }
+    .login-btn.secondary {
+      background: transparent; color: #374151;
+      border: 1.5px solid #e5e7eb; margin-top: 0.6rem;
+      font-weight: 500;
+    }
+    .login-btn.secondary:hover { background: #f9fafb; }
+    .login-divider {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin: 1.1rem 0 0.9rem; color: #9ca3af; font-size: 0.8rem;
+    }
+    .login-divider::before, .login-divider::after {
+      content: ''; flex: 1; height: 1px; background: #e5e7eb;
+    }
+    .login-error { color: #ef4444; font-size: 0.82rem; text-align: center; margin-top: 0.25rem; }
     /* Profile badge */
     .profile-badge {
       display: flex; align-items: center; gap: 0.5rem;
@@ -465,47 +511,68 @@
   <!-- ═══ LOGIN MODAL ═══ -->
   <div id="login-overlay" class="hidden" style="display:none">
     <div class="login-box">
-      <h2>Welcome to Test 1 2</h2>
+      <div class="login-box-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#1595b2"><path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 18.93V22h2v-2.07A8.001 8.001 0 0 0 20 12h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/></svg>
+      </div>
+      <h2>Welcome</h2>
+      <div class="login-box-subtitle">Sign in or create your account</div>
 
-      <!-- Step 1: USERID + PIN -->
+      <!-- Social provider buttons -->
       <div id="login-step-pin">
-        <div style="margin-bottom:0.55rem">
-          <div style="font-size:0.7rem;font-weight:600;color:#64748b;letter-spacing:0.06em;margin-bottom:0.3rem">USERNAME</div>
-          <div style="display:flex;gap:0.4rem;align-items:center">
-            <input id="login-userid" list="uid-datalist" class="login-input"
-              style="flex:1;margin:0" placeholder="e.g. WOLF.PX7K3A2B"
-              autocomplete="username" spellcheck="false">
-            <datalist id="uid-datalist"></datalist>
-            <button id="login-new-uid-btn" title="Add a different username (voice or type)"
-              style="width:38px;height:38px;border-radius:8px;background:rgba(21,149,178,0.12);border:1px solid rgba(21,149,178,0.4);color:#1595b2;font-size:1.35rem;cursor:pointer;flex-shrink:0;line-height:1;font-family:inherit">+</button>
-          </div>
-        </div>
-        <div style="margin-bottom:0.7rem">
-          <div style="font-size:0.7rem;font-weight:600;color:#64748b;letter-spacing:0.06em;margin-bottom:0.3rem">PASSWORD <span style="font-weight:400;font-size:0.65rem">(2 digits)</span></div>
-          <input id="login-pin" class="login-input" type="password"
-            placeholder="••" autocomplete="off" inputmode="numeric"
-            style="letter-spacing:0.5em;font-size:1.4rem;text-align:center;margin:0">
-        </div>
-        <button id="login-pin-btn" class="login-btn" style="margin-bottom:0.4rem">Login</button>
-        <button id="login-new-btn" class="login-btn"
-          style="background:rgba(21,149,178,0.08);border:1px solid rgba(21,149,178,0.35);color:#1595b2;font-size:0.85rem">
-          Create Profile
+        <button class="social-btn" id="btn-google" onclick="authWithGoogle()">
+          <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google
         </button>
-        <hr style="margin:0.6rem 0">
-        <div class="voice-toggle-wrap">
-          <label class="voice-toggle" title="Connect Voice Agent">
-            <input type="checkbox" id="voice-login-checkbox">
-            <span class="voice-toggle-track"><span class="voice-toggle-thumb"></span></span>
-          </label>
-          <span class="voice-toggle-label">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:1rem;height:1rem;opacity:0.7"><path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1 18.93V22h2v-2.07A8.001 8.001 0 0 0 20 12h-2a6 6 0 0 1-12 0H4a8.001 8.001 0 0 0 7 7.93z"/></svg>
-            Voice Agent
-          </span>
-        </div>
-        <div id="voice-login-status" style="display:none;font-size:0.75rem;color:#1595b2;text-align:center;padding:0.2rem 0">
-          <span id="voice-login-status-text"></span>
-        </div>
+        <button class="social-btn" id="btn-apple" onclick="authWithApple()">
+          <svg viewBox="0 0 24 24"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.4.07 2.38.74 3.2.8 1.22-.24 2.39-.93 3.68-.84 1.57.12 2.75.75 3.53 1.94-3.23 1.94-2.47 5.89.48 7.03-.57 1.52-1.32 3.02-2.89 3.93zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+          Continue with Apple
+        </button>
+        <div class="login-divider" id="login-divider-or">or</div>
+        <button class="social-btn phone-btn" id="btn-phone" onclick="showPhoneStep()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Continue with phone
+        </button>
         <div id="login-error" class="login-error" style="display:none"></div>
+        <!-- Phone number step -->
+        <div id="login-step-phone-num" style="display:none;margin-top:0.5rem">
+          <div style="font-size:0.75rem;font-weight:600;color:#374151;margin-bottom:0.4rem">PHONE NUMBER</div>
+          <input id="login-phone-input" class="login-input" type="tel"
+            placeholder="+1 (555) 000-0000" inputmode="tel" autocomplete="tel">
+          <button class="login-btn" style="margin-top:0.6rem" onclick="sendPhoneOtp()">Send code</button>
+          <button class="login-back" onclick="showProvidersStep()">← Back</button>
+          <div id="login-error-phone" class="login-error" style="display:none"></div>
+        </div>
+        <!-- OTP step -->
+        <div id="login-step-otp-verify" style="display:none;margin-top:0.5rem">
+          <p style="font-size:0.85rem;color:#374151;margin-bottom:0.75rem;text-align:center">
+            Enter the 6-digit code sent to <strong id="login-phone-display"></strong>
+          </p>
+          <input id="login-otp-input" class="login-input" type="number"
+            placeholder="123456" autocomplete="one-time-code"
+            style="text-align:center;font-size:1.5rem;letter-spacing:0.25em">
+          <button class="login-btn" style="margin-top:0.6rem" onclick="verifyPhoneOtp()">Verify code</button>
+          <button class="login-back" onclick="showPhoneStep()">← Back</button>
+          <div id="login-error-otp" class="login-error" style="display:none"></div>
+        </div>
+        <!-- Reveal username for new accounts -->
+        <div id="login-step-reveal-new" style="display:none;margin-top:0.5rem">
+          <p style="font-size:0.85rem;color:#374151;text-align:center;margin-bottom:0.75rem">Your username is:</p>
+          <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:0.75rem">
+            <div id="reveal-userid" style="font-size:1.4rem;font-weight:800;color:#1595b2;letter-spacing:0.05em"></div>
+          </div>
+          <p style="font-size:0.75rem;color:#ef4444;text-align:center;margin-bottom:0.75rem">Save this — it's your public username.</p>
+          <button class="login-btn" id="login-reveal-btn">Let's go! →</button>
+        </div>
+        <!-- Hidden stubs for JS compat -->
+        <input id="login-userid" type="hidden">
+        <input id="login-pin" type="hidden">
+        <div id="pin-input-wrap" style="display:none"></div>
+        <input type="checkbox" id="voice-login-checkbox" style="display:none">
+        <div id="voice-login-status" style="display:none"><span id="voice-login-status-text"></span></div>
+        <button id="login-new-uid-btn" style="display:none">+</button>
+        <datalist id="uid-datalist"></datalist>
+        <button id="login-pin-btn" style="display:none"></button>
+        <button id="login-new-btn" style="display:none"></button>
       </div>
 
 
@@ -522,9 +589,9 @@
       <div id="login-step-reveal" style="display:none">
         <p class="hint" style="text-align:center">✅ Your account is ready! Write these down:</p>
         <div style="background:rgba(21,149,178,0.1);border:1px solid rgba(21,149,178,0.3);border-radius:12px;padding:1rem;text-align:center;margin:0.5rem 0">
-          <div style="font-size:0.72rem;color:#64748b;margin-bottom:0.25rem">USERNAME</div>
+          <div style="font-size:0.72rem;color:#6b7280;margin-bottom:0.25rem">USERNAME</div>
           <div id="reveal-userid" style="font-size:1.2rem;font-weight:800;color:#1595b2;letter-spacing:0.06em;word-break:break-all"></div>
-          <div style="font-size:0.72rem;color:#64748b;margin:0.6rem 0 0.25rem">2-DIGIT PASSWORD</div>
+          <div style="font-size:0.72rem;color:#6b7280;margin:0.6rem 0 0.25rem">2-DIGIT PASSWORD</div>
           <div id="reveal-pin" style="font-size:2rem;font-weight:900;color:#22c55e;letter-spacing:0.3em"></div>
         </div>
         <p class="hint" style="font-size:0.72rem;color:#f87171;text-align:center">⚠️ Save these to log in from a new device.</p>
@@ -575,7 +642,7 @@
       <span id="pwd-reveal" style="display:none;font-weight:900;color:#22c55e;letter-spacing:0.2em;font-size:0.95rem;margin-left:4px"></span>
     </div>
     <!-- Log in link — shown when not logged in -->
-    <a id="header-login-link" class="header-login-link" href="#" style="display:none">Log in</a>
+    <a id="header-login-link" class="header-login-link" href="#" onclick="event.preventDefault();showLoginModal();">Log in</a>
     <p>
       Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, reply to a post, reply to a reply, create private channels and invite a friends through SMS to a private channel. I support 25 languages!
     </p>
@@ -599,6 +666,15 @@
       <button class="btn btn-ghost" style="padding:4px 12px;font-size:0.7rem;" id="clear-btn">Clear</button>
     </div>
     <div id="logs"></div>
+    <div id="text-prompt-form" style="display:flex;gap:0.5rem;margin-top:0.6rem;">
+      <input id="text-prompt-input"
+        type="text"
+        placeholder="Type a command…"
+        autocomplete="off"
+        style="flex:1;padding:0.5rem 0.75rem;border-radius:10px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:0.85rem;outline:none;"
+      />
+      <button type="button" id="text-prompt-send" style="padding:0.5rem 1rem;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;font-size:0.85rem;cursor:pointer;white-space:nowrap;">Send ↵</button>
+    </div>
   </div>
 
   <!-- ═══ PUBLIC CHANNEL ═══ -->
@@ -614,9 +690,16 @@
 
   <!-- ═══ PRIVATE CHANNELS ═══ -->
   <div class="channels-section">
-    <h2>🔒 Private Channels</h2>
-    <div id="private-channels-list">
-      <div class="ch-empty">Loading channels…</div>
+    <h2>🔒 Private Channels Created</h2>
+    <div id="private-channels-created">
+      <div class="ch-empty">Loading…</div>
+    </div>
+  </div>
+
+  <div class="channels-section">
+    <h2>🤝 Private Channels Joined</h2>
+    <div id="private-channels-joined">
+      <div class="ch-empty">Loading…</div>
     </div>
   </div>
 
@@ -951,7 +1034,7 @@ verifyBtn.addEventListener('click', async () => {
     if (!d.displayName) {
       stepOtp.style.display = 'none'; stepName.style.display = '';
       if (loginUsernameDisplay) loginUsernameDisplay.textContent = currentUser.displayName || '...';
-      speak(`Welcome to Test One Two! Your public username is ${d.displayName}. Tap Let's go to continue.`);
+      speak('This is Test 1 2, the vocal social network.');
     } else {
       onLoggedIn();
     }
@@ -1026,7 +1109,7 @@ if (newBtn) newBtn.addEventListener('click', async () => {
     const revealPin = document.getElementById('reveal-pin');
     if (revealUid) revealUid.textContent = userId;
     if (revealPin) revealPin.textContent = pin;
-    speak(`Your account has been created. Your username is ${userId.replace('.', ' dot ')}. Your 2-digit password is ${pin[0]}, ${pin[1]}. Write these down!`);
+    speak('This is Test 1 2, the vocal social network.');
   } catch (e) {
     if (stepCreating) stepCreating.style.display = 'none';
     if (stepPin) stepPin.style.display = '';
@@ -1034,9 +1117,13 @@ if (newBtn) newBtn.addEventListener('click', async () => {
   }
 });
 
-if (revealBtn) revealBtn.addEventListener('click', () => { onLoggedIn(); });
+if (revealBtn) revealBtn.addEventListener('click', () => {
+  document.getElementById('login-step-reveal-new').style.display = 'none';
+  ['btn-google','btn-apple','btn-phone','login-divider-or'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display=''; });
+  onLoggedIn();
+});
 
-logoutBtn.addEventListener('click', async () => {
+if (logoutBtn) logoutBtn.addEventListener('click', async () => {
   speak('Signing out. Goodbye!');
   await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
   clearAuthSession();
@@ -1057,7 +1144,7 @@ function onLoggedIn() {
   if (currentUser.phone) saveProfileToHistory(currentUser.phone, currentUser.displayName);
   // Save USERID to datalist history
   if (currentUser.displayName) saveUidToHistory(currentUser.displayName);
-  speak(`Welcome, ${currentUser.displayName || 'there'}! Your public username is ${currentUser.displayName}.`);
+  speak('This is Test 1 2, the vocal social network.');
   // Fetch full profile (includes plan tier and deluxeType)
   fetch('/api/auth/me', { headers: authHeaders() })
     .then(r => r.ok ? r.json() : null)
@@ -1233,7 +1320,8 @@ function getGpsPlusCode() {
     } catch (_) {}
     clearAuthSession();
   }
-  // No valid session — show Log in link instead of auto-popup
+  // No valid session — show login modal automatically + keep Log in link
+  if (typeof showLoginModal === 'function') showLoginModal();
   const hll = document.getElementById('header-login-link');
   if (hll) {
     hll.style.display = '';
@@ -1515,6 +1603,21 @@ const connectBtn  = document.getElementById('connect-btn');
 const disconnectBtn = document.getElementById('disconnect-btn');
 const clearBtn    = document.getElementById('clear-btn');
 
+// Wire text-prompt send button and Enter key — dispatchIntent is hoisted so safe to reference here
+setTimeout(() => {
+  const inp = document.getElementById('text-prompt-input');
+  const btn = document.getElementById('text-prompt-send');
+  if (!inp || !btn) return;
+  const send = async () => {
+    const q = inp.value.trim();
+    if (!q) return;
+    inp.value = '';
+    await dispatchIntent(q);
+  };
+  btn.addEventListener('click', send);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
+}, 0);
+
 let ws = null;
 let channelWs = null;  // Real-time WS for the active private channel
 let audioCtx = null;
@@ -1590,8 +1693,11 @@ async function mcpCall(toolName, toolArgs) {
   });
   if (!res.ok) throw new Error(`MCP error ${res.status}`);
   const data = await res.json();
-  const text = data?.result?.content?.[0]?.text;
-  return text ? JSON.parse(text) : data?.result;
+  const content = data?.result?.content?.[0];
+  const text = content?.text;
+  if (data?.result?.isError) throw new Error(text || 'MCP tool error');
+  if (text) { try { return JSON.parse(text); } catch { return { text }; } }
+  return data?.result;
 }
 
 // ── Voice agent mode ──
@@ -1616,12 +1722,15 @@ function refreshVAMode() {
 
 // ── MCP tools schema (shared by both Grok and Claude dispatchers) ──
 const MCP_TOOLS_SCHEMA = [
+  { name: 'join_public_channel', description: 'Switch to the public channel feed to read or post public voice messages.', parameters: { type: 'object', properties: {}, required: [] } },
   { name: 'list_posts', description: 'List recent public posts.', parameters: { type: 'object', properties: { limit: { type: 'number' } }, required: [] } },
   { name: 'create_post', description: 'Create a new public post.', parameters: { type: 'object', properties: { text: { type: 'string' }, author: { type: 'string' } }, required: ['text', 'author'] } },
-  { name: 'create_private_channel', description: 'Create a new private channel.', parameters: { type: 'object', properties: { name: { type: 'string' }, author: { type: 'string' } }, required: ['name', 'author'] } },
-  { name: 'join_private_channel', description: 'Join an existing private channel by ID.', parameters: { type: 'object', properties: { channel_id: { type: 'string' }, author: { type: 'string' } }, required: ['channel_id', 'author'] } },
-  { name: 'send_channel_message', description: 'Send a message to the active private channel.', parameters: { type: 'object', properties: { channel_id: { type: 'string' }, author: { type: 'string' }, text: { type: 'string' } }, required: ['channel_id', 'author', 'text'] } },
-  { name: 'read_channel_messages', description: 'Read recent messages from a private channel.', parameters: { type: 'object', properties: { channel_id: { type: 'string' } }, required: ['channel_id'] } },
+  { name: 'create_private_channel', description: 'Create a new private channel. Returns the channel object including its short alphanumeric id (e.g. "A1B2C3") — use that id for join/send/read calls.', parameters: { type: 'object', properties: { name: { type: 'string' }, author: { type: 'string' } }, required: ['name', 'author'] } },
+  { name: 'join_private_channel', description: 'Join an existing private channel. channel_id MUST be the short alphanumeric code (e.g. "A1B2C3") returned by create_private_channel or shared by another user — NOT the channel name.', parameters: { type: 'object', properties: { channel_id: { type: 'string', description: 'Short alphanumeric channel code, e.g. A1B2C3' }, author: { type: 'string' } }, required: ['channel_id', 'author'] } },
+  { name: 'list_private_channels_I_created', description: 'List private channels the current user created. Returns each channel id (short code) and name. Use these ids for send/read calls.', parameters: { type: 'object', properties: {}, required: [] } },
+  { name: 'list_the_private_channels_I_joined', description: 'List private channels the current user joined but did not create. Returns each channel id (short code) and name.', parameters: { type: 'object', properties: {}, required: [] } },
+  { name: 'send_channel_message', description: 'Send a message to a private channel. channel_id is the short alphanumeric code.', parameters: { type: 'object', properties: { channel_id: { type: 'string', description: 'Short alphanumeric channel code' }, author: { type: 'string' }, text: { type: 'string' } }, required: ['channel_id', 'author', 'text'] } },
+  { name: 'read_channel_messages', description: 'Read recent messages from a private channel. channel_id is the short alphanumeric code.', parameters: { type: 'object', properties: { channel_id: { type: 'string', description: 'Short alphanumeric channel code' } }, required: ['channel_id'] } },
   { name: 'list_aliases', description: 'List all nickname aliases saved for this account.', parameters: { type: 'object', properties: {}, required: [] } },
   { name: 'set_alias', description: 'Save a nickname so a username shows a friendlier name everywhere.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Raw username e.g. WOLF.PX7K3A' }, alias: { type: 'string', description: 'Friendly nickname to display' } }, required: ['username', 'alias'] } },
   { name: 'remove_alias', description: 'Remove a saved nickname alias by username.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Username whose alias to remove' } }, required: ['username'] } },
@@ -1635,33 +1744,82 @@ async function dispatchWithClaude(transcript) {
     + `The user's username is "${author}". Active channel: "${activeChannelId || 'public'}". `
     + `Use tools to fulfill the request. Reply in 1-2 SHORT sentences — the reply will be spoken aloud. No markdown.`;
 
-  const resp = await fetch('/api/claude-chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ transcript, systemPrompt, tools: MCP_TOOLS_SCHEMA }),
-  });
-  if (!resp.ok) throw new Error(`Claude API ${resp.status}`);
+  // Retry up to 3× on 529 (overloaded) or 503
+  let resp, lastStatus;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    resp = await fetch('/api/claude-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ transcript, systemPrompt, tools: MCP_TOOLS_SCHEMA }),
+    });
+    lastStatus = resp.status;
+    if (resp.ok) break;
+    if (resp.status !== 529 && resp.status !== 503) break; // non-retryable error
+    const delay = (attempt + 1) * 1500;
+    log('agent', `Claude is busy (${resp.status}), retrying in ${delay/1000}s…`);
+    await new Promise(r => setTimeout(r, delay));
+  }
+  if (!resp.ok) {
+    if (lastStatus === 529 || lastStatus === 503)
+      throw new Error('Claude is currently overloaded. Please try again in a few seconds.');
+    throw new Error(`Claude API ${lastStatus}`);
+  }
   const data = await resp.json();
 
-  // Execute any tool calls the backend resolved
+  // Tools handled entirely via REST (bypassing mcpCall to avoid MCP auth/lookup failures)
+  const REST_ONLY_TOOLS = new Set([
+    'join_public_channel',
+    'join_private_channel',
+    'list_private_channels_I_created',
+    'list_the_private_channels_I_joined',
+    'list_aliases', 'set_alias', 'remove_alias',
+  ]);
+
   if (data.toolCalls?.length) {
     for (const tc of data.toolCalls) {
       log('tool', `${tc.name}(${JSON.stringify(tc.input)})`);
       try {
-        const result = await mcpCall(tc.name, tc.input);
+        // Only call MCP for tools that run server-side via the MCP endpoint
+        const result = REST_ONLY_TOOLS.has(tc.name) ? null : await mcpCall(tc.name, tc.input);
+
+        if (tc.name === 'join_public_channel') {
+          setActiveChannel('public'); loadPublicPosts();
+          ptSpeak('Switched to the public channel.');
+        }
         if (tc.name === 'list_posts' || tc.name === 'create_post') {
           setActiveChannel('public'); loadPublicPosts();
         }
         if (tc.name === 'create_private_channel' && result?.channel) {
-          addMyChannelId(result.channel.id); loadPrivateChannels();
+          const newCh = result.channel;
+          const joinResp = await fetch(`/api/channels/${newCh.id}/join`, { method: 'POST', headers: authHeaders() });
+          if (!joinResp.ok) {
+            const je = await joinResp.json().catch(() => ({}));
+            log('error', `Auto-join failed (${joinResp.status}): ${je.error || ''}`);
+          } else { addMyChannelId(newCh.id); }
+          await loadPrivateChannels();
+          const idSpoken = newCh.id.split('').join(' ');
+          ptSpeak(`Channel ${newCh.name} created. Your channel ID is ${idSpoken}. You have been joined automatically.`);
         }
-        if (tc.name === 'join_private_channel') {
-          loadPrivateChannels();
+        if (tc.name === 'join_private_channel' && tc.input?.channel_id) {
+          const cid = tc.input.channel_id.toUpperCase().replace(/\s+/g, ''); // normalise
+          const jr = await fetch(`/api/channels/${cid}/join`, { method: 'POST', headers: authHeaders() });
+          if (jr.ok) {
+            const jd = await jr.json().catch(() => ({}));
+            const chName = jd.channel?.name || cid;
+            addMyChannelId(cid); setActiveChannel(cid); await loadPrivateChannels();
+            ptSpeak(`You joined ${chName}.`);
+          } else {
+            const je = await jr.json().catch(() => ({}));
+            log('error', `Join failed (${jr.status}): ${je.error || 'Channel not found'}`);
+            ptSpeak('Channel not found. Please check the ID and try again.');
+          }
+        }
+        if (tc.name === 'list_private_channels_I_created' || tc.name === 'list_the_private_channels_I_joined') {
+          await loadPrivateChannels();
         }
         if (tc.name === 'send_channel_message' || tc.name === 'read_channel_messages') {
           if (activeChannelId && activeChannelId !== 'public') loadChannelMessages(activeChannelId);
         }
-        // ── Alias tools — call /api/aliases directly ──
         if (tc.name === 'list_aliases') { await aliasLoad(); renderAliasPanel(); }
         if (tc.name === 'set_alias' && tc.input?.username && tc.input?.alias) {
           await aliasSet(tc.input.username.trim(), tc.input.alias.trim()); renderAliasPanel();
@@ -1788,18 +1946,23 @@ async function dispatchIntent(transcript) {
         const data = await mcpCall('create_private_channel', { name: chName, author });
         const ch = data?.channel;
         if (ch) {
+          // Register membership via REST (MCP tool doesn't call addChannelMember)
+          await fetch(`/api/channels/${ch.id}/join`, { method: 'POST', headers: authHeaders() }).catch(() => {});
           addMyChannelId(ch.id); setActiveChannel(ch.id); loadPrivateChannels();
-          ptSpeak(`Channel ${ch.name} created. ID is ${ch.id}.`);
-          log('agent', `Channel <b>${ch.name}</b> (${ch.id}) created.`);
+          const idSpoken = ch.id.split('').join(' ');
+          ptSpeak(`Channel ${ch.name} created. Your channel ID is ${idSpoken}. You have been joined automatically.`);
+          log('agent', `Channel <b>${ch.name}</b> created &amp; joined. ID: <b>${ch.id}</b>`);
         }
       } else if (/\b(join|enter|go to)\b.*\bchannel\b/.test(t)) {
         const idMatch = transcript.match(/\b([A-Z0-9]{6})\b/i);
         if (!idMatch) { ptSpeak('Please say the 6-character channel ID.'); }
         else {
           const channelId = idMatch[1].toUpperCase();
-          const data = await mcpCall('join_private_channel', { channel_id: channelId, author });
+          await mcpCall('join_private_channel', { channel_id: channelId, author });
+          // Register membership via REST
+          await fetch(`/api/channels/${channelId}/join`, { method: 'POST', headers: authHeaders() }).catch(() => {});
           addMyChannelId(channelId); setActiveChannel(channelId); loadPrivateChannels();
-          ptSpeak(`Joined channel. ${(data?.messages||[]).length} recent messages.`);
+          ptSpeak(`Joined channel.`);
           log('agent', `Joined <b>${channelId}</b>.`);
         }
       } else if (activeChannelId && activeChannelId !== 'public' && /\b(send|say|message|tell)\b/.test(t)) {
@@ -1813,6 +1976,13 @@ async function dispatchIntent(transcript) {
       }
     }
   } catch (err) {
+    const msg = err.message || 'Unknown error';
+    log('error', 'Agent error: ' + msg);
+    if (msg.includes('overloaded') || msg.includes('529')) {
+      ptSpeak('The AI is busy right now. Please try again in a moment.');
+    }
+    setStatus('Error'); setOrb('');
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -2042,6 +2212,19 @@ function updateAgentUI() {
 
   disconnectBtn.addEventListener('click', () => { if(rtWs) rtWs.close(); rtCleanup(); });
 
+  // ── Spacebar shortcut — press Space to Connect/Stop ──
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space') return;
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+    e.preventDefault();
+    if (!disconnectBtn.disabled) {
+      disconnectBtn.click();
+    } else if (!connectBtn.disabled) {
+      connectBtn.click();
+    }
+  });
+
   // ── PTT click — handles Standard (Haiku) and Deluxe Claude (Sonnet) ──
   connectBtn.addEventListener('click', () => {
     if (VA_MODE !== 'llm' && VA_MODE !== 'deluxe-claude') return;
@@ -2051,15 +2234,32 @@ function updateAgentUI() {
     ptRecognizer = new SR();
     ptRecognizer.lang = navigator.language || 'en-US';
     ptRecognizer.interimResults = false; ptRecognizer.maxAlternatives = 1;
+    let sttRetries = 0;
+    ptRecognizer.onerror = (e) => {
+      if (e.error === 'network' && sttRetries < 3) {
+        sttRetries++;
+        log('agent', `STT network error — retrying (${sttRetries}/3)…`);
+        setTimeout(() => { try { ptRecognizer.start(); } catch(_) {} }, 1000);
+      } else if (e.error === 'no-speech') {
+        // silent — user just didn't speak
+        setStatus('Tap to speak'); connectBtn.disabled = false; connectBtn.textContent = '🎙️ Tap to speak';
+      } else {
+        log('error', 'STT error: ' + e.error);
+        setStatus('Tap to speak'); connectBtn.disabled = false; connectBtn.textContent = '🎙️ Tap to speak';
+      }
+    };
     ptRecognizer.onstart = () => {
+      sttRetries = 0; // reset retry count on successful start
       ptListening=true; setOrb('listening'); setStatus('Listening…');
       connectBtn.textContent='🔴 Listening…'; connectBtn.disabled=true;
     };
-    ptRecognizer.onresult = (e) => { const t=e.results[0][0].transcript.trim(); if(t) dispatchIntent(t); };
-    ptRecognizer.onerror = (e) => { log('error','STT error: '+e.error); setStatus('Tap to speak'); };
+    ptRecognizer.onresult = (e) => {
+      const t = e.results[0][0].transcript.trim();
+      if (t) dispatchIntent(t);
+    };
     ptRecognizer.onend = () => {
-      ptListening=false; setOrb(''); setStatus('Tap to speak');
-      updateAgentUI(); connectBtn.disabled=false;
+      ptListening = false; setOrb(''); setStatus('Tap to speak');
+      updateAgentUI(); connectBtn.disabled = false; connectBtn.textContent = '🎙️ Tap to speak';
     };
     ptRecognizer.start();
   });
@@ -2068,188 +2268,6 @@ function updateAgentUI() {
   updateAgentUI();
 }
 
-  function playPcm16Chunk(b64) {
-    if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const pcm = base64ToInt16Array(b64);
-    const f32 = new Float32Array(pcm.length);
-    for (let i=0;i<pcm.length;i++) f32[i]=pcm[i]/(pcm[i]<0?0x8000:0x7FFF);
-    const buf = audioCtx.createBuffer(1, f32.length, 24000);
-    buf.getChannelData(0).set(f32);
-    const src = audioCtx.createBufferSource(); src.buffer=buf; src.connect(audioCtx.destination);
-    const now = audioCtx.currentTime, startAt = Math.max(now, nextPlayTime);
-    src.start(startAt); nextPlayTime = startAt + buf.duration;
-  }
-
-  async function startMicrophone() {
-    if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
-    await audioCtx.resume();
-    // sampleRate constraint omitted: Safari throws OverconstrainedError if unsupported
-    micStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
-    const src = audioCtx.createMediaStreamSource(micStream);
-    micProcessor = audioCtx.createScriptProcessor(4096,1,1);
-    micProcessor.onaudioprocess = (e) => {
-      if (!ws||ws.readyState!==WebSocket.OPEN) return;
-      const b64 = arrayBufferToBase64(float32ToPcm16(e.inputBuffer.getChannelData(0)).buffer);
-      ws.send(JSON.stringify({type:'input_audio_buffer.append',audio:b64}));
-    };
-    src.connect(micProcessor); micProcessor.connect(audioCtx.destination);
-    setOrb('listening'); setStatus('Listening… speak naturally');
-    log('audio','Microphone streaming at <b>24 kHz PCM16</b>');
-  }
-
-  function stopMicrophone() {
-    if (micProcessor){micProcessor.disconnect();micProcessor=null;}
-    if (micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
-    if (audioCtx){audioCtx.close().catch(()=>{});audioCtx=null;}
-  }
-
-  function deluxeCleanup() {
-    isConnected=false; isSpeaking=false; transcriptBuffer='';
-    stopMicrophone(); setOrb(''); setStatus('Disconnected');
-    connectBtn.disabled=false; disconnectBtn.disabled=true; ws=null;
-  }
-
-  function handleDeluxeEvent(ev) {
-    const msg = JSON.parse(ev.data);
-    switch (msg.type) {
-      case 'session.created': log('ws','Session created — model: <b>'+(msg.session?.model||'grok')+'</b>'); break;
-      case 'mcp_list_tools.completed': log('ws','MCP tools loaded ✓'); greetDeluxe(); break;
-      case 'input_audio_buffer.speech_started': setOrb('listening'); setStatus('Listening…'); nextPlayTime=0; isSpeaking=false; break;
-      case 'input_audio_buffer.speech_stopped': setStatus('Thinking…'); setOrb('connecting'); break;
-      case 'conversation.item.input_audio_transcription.completed': if(msg.transcript) log('text','You: <b>'+msg.transcript+'</b>'); break;
-      case 'response.output_audio_transcript.delta': transcriptBuffer+=(msg.delta||''); break;
-      case 'response.output_audio_transcript.done': if(transcriptBuffer){log('agent','Agent: <b>'+transcriptBuffer+'</b>');transcriptBuffer='';} break;
-      case 'response.output_audio.delta':
-        if (!isSpeaking){isSpeaking=true;setOrb('speaking');setStatus('Agent speaking…');}
-        playPcm16Chunk(msg.delta); break;
-      case 'response.output_audio.done': {
-        const rem=Math.max(0,nextPlayTime-(audioCtx?.currentTime||0));
-        setTimeout(()=>{isSpeaking=false;setOrb('listening');setStatus('Listening…');},rem*1000+200); break;
-      }
-      case 'response.output_item.done':
-        if (msg.item?.type==='function_call') {
-          const {name,call_id,arguments:rawArgs}=msg.item;
-          let args={}; try{args=JSON.parse(rawArgs||'{}');}catch(_){}
-          log('tool',`Called: <b>${name}</b>`);
-          if (['pick_contact','send_invite','set_alias','remove_alias'].includes(name)) handleClientTool(name,args,call_id);
-        } break;
-      case 'response.mcp_call.completed': {
-        const tn=msg.mcp_call?.name||'';
-        const out=(()=>{try{return JSON.parse(msg.mcp_call?.output||'{}');}catch(_){return{};}})();
-        if (tn==='list_posts'||tn==='create_post'){setActiveChannel('public');loadPublicPosts();}
-        if (['read_channel_messages','send_channel_message','join_private_channel','create_private_channel'].includes(tn)){
-          const cid=out.channel?.id||out.channel_id||out.id||(()=>{try{return JSON.parse(msg.mcp_call?.arguments||'{}').channelId;}catch(_){}})();
-          if(cid){addMyChannelId(cid);setActiveChannel(cid);}
-          loadPrivateChannels();
-        } break;
-      }
-      case 'error': log('error',msg.error?.message||JSON.stringify(msg.error)); break;
-    }
-  }
-
-  function greetDeluxe() {
-    if (!ws||ws.readyState!==WebSocket.OPEN) return;
-    const promptText = isAutoJoin
-      ? `The user "${autoUsername}" wants to join private channel "${autoChannelId}". Call join_private_channel then greet them and read recent messages aloud.`
-      : `You are now connected with full MCP access. Briefly greet the user and summarise what you can help with in one sentence.`;
-    ws.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:promptText}]}}));
-    ws.send(JSON.stringify({type:'response.create',response:{modalities:['text','audio']}}));
-    setOrb('speaking'); setStatus(isAutoJoin?'Joining channel…':'Agent introducing tools…');
-  }
-
-  connectBtn.textContent = '🌟 Connect (Deluxe)';
-  connectBtn.addEventListener('click', async () => {
-    if (isConnected) return;
-    connectBtn.disabled = true; setOrb('connecting'); setStatus('Obtaining session token…');
-    log('ws','Requesting ephemeral token from <b>/api/session</b>…');
-    if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
-    await audioCtx.resume();
-    try {
-      const res = await fetch('/api/session',{method:'POST'});
-      if (!res.ok) throw new Error(`Session token failed: ${res.status}`);
-      const data = await res.json();
-      const token = data.client_secret?.value||data.value||data.secret||data.token;
-      if (!token) throw new Error('No token in response');
-      log('ws','Token received. Connecting to xAI Realtime…'); setStatus('Connecting to xAI…');
-      ws = new WebSocket('wss://api.x.ai/v1/realtime?model=grok-voice-latest',[`xai-client-secret.${token}`]);
-      ws.onopen = () => {
-        isConnected=true; log('ws','<b>WebSocket connected</b>'); setStatus('Configuring session…');
-        connectBtn.disabled=true; disconnectBtn.disabled=false;
-        ws.send(JSON.stringify({type:'session.update',session:{
-          voice:'ara',
-          instructions:
-            'You are a helpful voice assistant for Test One Two dot net (Test12), a voice-first social platform. '
-            +'Be action-oriented and concise. You have MCP tools for posts and channels, plus local tools: '
-            +'pick_contact, send_invite, set_alias, remove_alias. '
-            +`Current user: ${currentUser?.displayName||'unknown'}. Speak in the user's language.`,
-          turn_detection:{type:'server_vad'},
-          modalities:['text','audio'],
-          input_audio_transcription:{model:'grok-2-latest'},
-          input_audio_format:'pcm16', output_audio_format:'pcm16',
-          tools:[
-            {type:'mcp',server_label:'Test12',server_url:MCP_URL,require_approval:'never'},
-            {type:'function',name:'pick_contact',description:'Open phone contact picker (mobile only).',parameters:{type:'object',properties:{},required:[]}},
-            {type:'function',name:'send_invite',description:'Send a private channel invite via SMS/email/WhatsApp.',parameters:{type:'object',properties:{phone:{type:'string'},email:{type:'string'},use_whatsapp:{type:'boolean'},channel_id:{type:'string'},contact_name:{type:'string'},sender_name:{type:'string'}},required:['channel_id']}},
-            {type:'function',name:'set_alias',description:'Remember a personal nickname for a username.',parameters:{type:'object',properties:{username:{type:'string'},alias:{type:'string'}},required:['username','alias']}},
-            {type:'function',name:'remove_alias',description:'Remove a personal alias.',parameters:{type:'object',properties:{username:{type:'string'}},required:['username']}}
-          ],
-          tool_choice:'auto'
-        }}));
-        log('agent','Session configured with <b>MCP tools</b> → '+MCP_URL);
-        startMicrophone();
-      };
-      ws.onmessage = handleDeluxeEvent;
-      ws.onerror = (err) => { log('error','WebSocket error'); console.error(err); };
-      ws.onclose = (ev) => {
-        log('ws',`WebSocket closed (${ev.code})`);
-        const unexpected = isConnected && ev.code!==1000;
-        deluxeCleanup();
-        if (unexpected && (ev.code===1005||ev.code===1006)) {
-          log('ws','Session timed out — reconnecting in 2s…'); setStatus('Reconnecting…');
-          connectBtn.disabled=true; setTimeout(()=>{ if(!isConnected) connectBtn.click(); },2000);
-        }
-      };
-    } catch (err) { log('error',err.message); setStatus('Connection failed'); setOrb(''); connectBtn.disabled=false; }
-  });
-
-  disconnectBtn.addEventListener('click', () => { if(ws) ws.close(); deluxeCleanup(); });
-  disconnectBtn.disabled = true;
-  setStatus('Click Connect to start');
-  log('ws','<b>Deluxe mode</b> — xAI Realtime Voice Agent with MCP tools');
-
-} else {
-  // ── Plan 1 (free) & Plan 2 (cheap/llm) — Push-to-talk ──
-  connectBtn.textContent = VA_MODE === 'llm' ? '🤖 Tap to Speak (AI)' : '🎤 Tap to Speak';
-  connectBtn.addEventListener('click', () => {
-    if (ptListening) return;
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      ptSpeak('Speech recognition is not supported. Please use Chrome.');
-      log('error','SpeechRecognition not supported.'); return;
-    }
-    ptRecognizer = new SR();
-    ptRecognizer.lang = navigator.language || 'en-US';
-    ptRecognizer.interimResults = false; ptRecognizer.maxAlternatives = 1;
-    ptRecognizer.onstart = () => {
-      ptListening=true; setOrb('listening'); setStatus('Listening…');
-      connectBtn.textContent='🔴 Listening…'; connectBtn.disabled=true;
-      log('audio','Listening…');
-    };
-    ptRecognizer.onresult = (e) => { const t=e.results[0][0].transcript.trim(); if(t) dispatchIntent(t); };
-    ptRecognizer.onerror = (e) => { log('error','STT error: '+e.error); setStatus('Tap to speak'); };
-    ptRecognizer.onend = () => {
-      ptListening=false; setOrb(''); setStatus('Tap to speak');
-      connectBtn.textContent = VA_MODE==='llm'?'🤖 Tap to Speak (AI)':'🎤 Tap to Speak';
-      connectBtn.disabled=false;
-    };
-    ptRecognizer.start();
-  });
-  disconnectBtn.style.display = 'none';
-  setStatus('Tap to speak');
-  if (VA_MODE === 'llm') log('ws','<b>AI mode</b> — Grok mini + Browser STT/TTS');
-  else log('ws','<b>Free mode</b> — Browser STT + Rule-based + Browser TTS');
-}
 
 
 //  Client-side tool handlers
@@ -2265,11 +2283,11 @@ async function handleClientTool(name, args, callId) {
   } else if (name === 'set_alias') {
     const { username, alias } = args;
     if (!username || !alias) { result = { error: 'username and alias are required' }; }
-    else { setAlias(username, alias); renderAliasPanel(); result = { ok: true, message: `${username} will now appear as "${alias}" to you.` }; }
+    else { await aliasSet(username, alias); renderAliasPanel(); result = { ok: true, message: `${username} will now appear as "${alias}" to you.` }; }
   } else if (name === 'remove_alias') {
     const { username } = args;
     if (!username) { result = { error: 'username is required' }; }
-    else { removeAlias(username); renderAliasPanel(); result = { ok: true, message: `Alias for ${username} removed.` }; }
+    else { await aliasRemove(username); renderAliasPanel(); result = { ok: true, message: `Alias for ${username} removed.` }; }
   } else {
     result = { error: 'Unknown client tool: ' + name };
   }
@@ -2431,12 +2449,21 @@ async function loadPrivateChannels() {
     const res = await fetch('/api/channels', { headers: authHeaders() });
     if (!res.ok) return;
     const data = await res.json();
-    const container = document.getElementById('private-channels-list');
+    const createdBox = document.getElementById('private-channels-created');
+    const joinedBox  = document.getElementById('private-channels-joined');
+
     if (!data.channels || data.channels.length === 0) {
-      container.innerHTML = '<div class="ch-empty">No private channels yet. Ask the voice agent to create one!</div>';
+      createdBox.innerHTML = '<div class="ch-empty">No channels created yet.</div>';
+      joinedBox.innerHTML  = '<div class="ch-empty">No channels joined yet.</div>';
       return;
     }
-    container.innerHTML = data.channels.map(ch => {
+
+    // Determine ownership — created_by may be displayName (MCP path) or phone (REST path)
+    const myPhone       = currentUser?.phone || '';
+    const myDisplayName = currentUser?.displayName || '';
+    const isMine = ch => ch.created_by === myPhone || ch.created_by === myDisplayName;
+
+    const renderChannel = ch => {
       const date = new Date(ch.created_at).toLocaleString();
       return `<div class="channel-panel" id="channel-${ch.id}" data-channel="${ch.id}" onclick="setActiveChannel('${ch.id}')">
         <div class="ch-name"><span class="ch-id">${ch.id}</span>${ch.name}</div>
@@ -2445,12 +2472,25 @@ async function loadPrivateChannels() {
           <div class="ch-empty">Click to view messages</div>
         </div>
       </div>`;
-    }).join('');
+    };
 
-    // Re-apply the currently active channel after re-render
+    const created = data.channels.filter(isMine);
+    const joined  = data.channels.filter(ch => !isMine(ch));
+
+    createdBox.innerHTML = created.length
+      ? created.map(renderChannel).join('')
+      : '<div class="ch-empty">No channels created yet.</div>';
+
+    joinedBox.innerHTML = joined.length
+      ? joined.map(renderChannel).join('')
+      : '<div class="ch-empty">No channels joined yet.</div>';
+
+    // Re-apply active state
     if (activeChannelId && activeChannelId !== 'public') {
-      const panel = container.querySelector(`[data-channel="${activeChannelId}"]`);
-      if (panel) panel.classList.add('active');
+      [createdBox, joinedBox].forEach(box => {
+        const panel = box.querySelector(`[data-channel="${activeChannelId}"]`);
+        if (panel) panel.classList.add('active');
+      });
     }
 
     // Auto-join via URL param
@@ -2570,6 +2610,144 @@ if (isAutoJoin) {
   // Small delay to let the page render
   setTimeout(() => connectBtn.click(), 500);
 }
+
+
+// ── Social Auth (Google / Apple / Phone) ────────────────────────────────────
+let _googleClientId = null, _appleServiceId = null;
+let _phoneIdentifier = '';
+
+(async function loadClientConfig() {
+  try {
+    const r = await fetch('/api/config/client');
+    const cfg = r.ok ? await r.json() : {};
+    _googleClientId = cfg.googleClientId || null;
+    _appleServiceId = cfg.appleServiceId || null;
+    if (_googleClientId) {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true; document.head.appendChild(s);
+    }
+    if (_appleServiceId) {
+      const s = document.createElement('script');
+      s.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
+      s.async = true; document.head.appendChild(s);
+    }
+  } catch(_) {}
+})();
+
+function showProvidersStep() {
+  document.getElementById('login-step-phone-num').style.display = 'none';
+  document.getElementById('login-step-otp-verify').style.display = 'none';
+  document.getElementById('login-step-reveal-new').style.display = 'none';
+  ['btn-google','btn-apple','btn-phone','login-divider-or'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display=''; });
+}
+function showPhoneStep() {
+  document.getElementById('login-step-phone-num').style.display = '';
+  document.getElementById('login-step-otp-verify').style.display = 'none';
+  document.getElementById('login-step-reveal-new').style.display = 'none';
+  ['btn-google','btn-apple','btn-phone','login-divider-or'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  document.getElementById('login-phone-input')?.focus();
+}
+function _showErr(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 6000);
+}
+
+async function authWithGoogle() {
+  if (!_googleClientId) { _showErr('login-error','Google sign-in not configured.'); return; }
+  const btn = document.getElementById('btn-google');
+  if (btn) btn.disabled = true;
+  try {
+    const client = google.accounts.oauth2.initCodeClient({
+      client_id: _googleClientId, scope: 'openid email profile', ux_mode: 'popup',
+      callback: async (resp) => {
+        if (resp.error) { if (btn) btn.disabled=false; return; }
+        await _finishSocialAuth('/api/auth/google', { code: resp.code });
+      },
+    });
+    client.requestCode();
+  } catch(e) { _showErr('login-error', e.message); if (btn) btn.disabled=false; }
+}
+
+async function authWithApple() {
+  if (!_appleServiceId) { _showErr('login-error','Apple sign-in not configured.'); return; }
+  try {
+    AppleID.auth.init({ clientId: _appleServiceId, scope: 'name email',
+      redirectURI: window.location.origin, usePopup: true });
+    const data = await AppleID.auth.signIn();
+    await _finishSocialAuth('/api/auth/apple', { id_token: data.authorization.id_token, user: data.user||null });
+  } catch(e) { if (e?.error !== 'popup_closed_by_user') _showErr('login-error', e?.error||'Apple failed'); }
+}
+
+async function sendPhoneOtp() {
+  const raw = (document.getElementById('login-phone-input')?.value||'').trim();
+  if (!raw) { _showErr('login-error-phone','Enter your phone number.'); return; }
+  const btn = document.querySelector('#login-step-phone-num .login-btn');
+  if (btn) { btn.disabled=true; btn.textContent='Sending…'; }
+  try {
+    const r = await fetch('/api/auth/send-otp', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({identifier:raw}) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error||'Failed to send');
+    _phoneIdentifier = raw;
+    const disp = document.getElementById('login-phone-display');
+    if (disp) disp.textContent = raw;
+    document.getElementById('login-step-phone-num').style.display = 'none';
+    document.getElementById('login-step-otp-verify').style.display = '';
+    document.getElementById('login-otp-input')?.focus();
+  } catch(e) { _showErr('login-error-phone', e.message);
+  } finally { if (btn) { btn.disabled=false; btn.textContent='Send code'; } }
+}
+
+async function verifyPhoneOtp() {
+  const code = (document.getElementById('login-otp-input')?.value||'').trim();
+  if (!code) { _showErr('login-error-otp','Enter the code.'); return; }
+  const btn = document.querySelector('#login-step-otp-verify .login-btn');
+  if (btn) { btn.disabled=true; btn.textContent='Verifying…'; }
+  try {
+    const r = await fetch('/api/auth/verify-otp', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({identifier:_phoneIdentifier,code}) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error||'Invalid code');
+    await _applySession(d);
+  } catch(e) { _showErr('login-error-otp', e.message);
+  } finally { if (btn) { btn.disabled=false; btn.textContent='Verify code'; } }
+}
+
+async function _finishSocialAuth(endpoint, body) {
+  try {
+    const r = await fetch(endpoint, { method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error||'Auth failed');
+    await _applySession(d);
+  } catch(e) {
+    _showErr('login-error', e.message);
+    ['btn-google','btn-apple'].forEach(id => { const b=document.getElementById(id); if(b)b.disabled=false; });
+  }
+}
+
+async function _applySession(d) {
+  setAuthSession(d.token, d.identifier, d.displayName);
+  currentUser = { token:d.token, phone:d.identifier, displayName:d.displayName };
+  // Fetch canonical displayName (generated username)
+  try {
+    const me = await fetch('/api/auth/me', { headers:{'Authorization':'Bearer '+d.token} });
+    if (me.ok) { const u = await me.json(); currentUser.displayName = u.displayName || d.displayName; }
+  } catch(_) {}
+  const username = currentUser.displayName || '';
+  const el = document.getElementById('reveal-userid');
+  if (el) el.textContent = username;
+  // Show reveal step so user sees their auto-generated username
+  document.getElementById('login-step-phone-num').style.display = 'none';
+  document.getElementById('login-step-otp-verify').style.display = 'none';
+  ['btn-google','btn-apple','btn-phone','login-divider-or'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+  document.getElementById('login-step-reveal-new').style.display = '';
+}
+
+// finishReveal handled by revealBtn legacy listener
 
 </script>
 </body>
