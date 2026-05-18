@@ -1466,6 +1466,122 @@ app.get('/api/addon/usage', requireAuth, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+//  Billing — GET /api/billing/config
+//  Returns the Stripe publishable key (safe to expose to the browser)
+// ──────────────────────────────────────────────
+app.get('/api/billing/config', (req, res) => {
+  res.json({ publishableKey: STRIPE_PUBLIC_KEY || null });
+});
+
+// ──────────────────────────────────────────────
+//  Billing — POST /api/billing/subscribe-direct
+//  SCA-compliant: creates a Stripe Customer + Subscription from a PaymentMethod
+//  collected by Stripe Elements in the browser. Handles 3DS via clientSecret.
+//  Body: { paymentMethodId, blocks: ['xai', 'claude-sonnet', …] }
+//  Returns: { subscribed: true } or { requiresAction: true, clientSecret }
+// ──────────────────────────────────────────────
+app.post('/api/billing/subscribe-direct', requireAuth, async (req, res) => {
+  if (!STRIPE_SECRET_KEY) return res.status(503).json({ error: 'Stripe not configured' });
+  if (!MONTHLY_PRICE_ID)  return res.status(503).json({ error: 'Monthly plan not configured' });
+  const { paymentMethodId, blocks = [] } = req.body || {};
+  if (!paymentMethodId) return res.status(400).json({ error: 'paymentMethodId required' });
+  const validBlocks = blocks.filter(b => DELUXE_PRICE_IDS[b]);
+  try {
+    const stripe = require('stripe')(STRIPE_SECRET_KEY);
+    const user   = await db.getUserById(req.user.phone);
+    const baseUrl = process.env.BASE_URL || 'https://test12.net';
+
+    // ── 1. Create or reuse Stripe Customer ──
+    let customerId = user?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        payment_method: paymentMethodId,
+        invoice_settings: { default_payment_method: paymentMethodId },
+        metadata: { userId: req.user.phone, displayName: user?.displayName || '' },
+      });
+      customerId = customer.id;
+      await db.setStripeCustomerId(req.user.phone, customerId);
+    } else {
+      // Attach new payment method and set as default
+      await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+      await stripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+    }
+
+    // ── 2. Add one-time block charges to the upcoming invoice ──
+    for (const addonType of validBlocks) {
+      await stripe.invoiceItems.create({
+        customer: customerId,
+        price: DELUXE_PRICE_IDS[addonType],
+      });
+    }
+
+    // ── 3. Create subscription (incomplete until payment confirmed) ──
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: MONTHLY_PRICE_ID }],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      expand: ['latest_invoice.payment_intent'],
+      metadata: { userId: req.user.phone, blocks: validBlocks.join(',') },
+    });
+
+    const paymentIntent = subscription.latest_invoice?.payment_intent;
+
+    if (!paymentIntent) {
+      // Already paid (e.g. $0 trial) — activate immediately
+      await db.setUserPlan(req.user.phone, 'standard', subscription.id);
+      for (const addonType of validBlocks) {
+        await db.recordAddonPurchase(req.user.phone, addonType, subscription.id);
+      }
+      return res.json({ subscribed: true });
+    }
+
+    if (paymentIntent.status === 'succeeded') {
+      await db.setUserPlan(req.user.phone, 'standard', subscription.id);
+      for (const addonType of validBlocks) {
+        await db.recordAddonPurchase(req.user.phone, addonType, subscription.id);
+      }
+      return res.json({ subscribed: true });
+    }
+
+    if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_confirmation') {
+      // Return clientSecret so the browser can complete 3DS
+      return res.json({ requiresAction: true, clientSecret: paymentIntent.client_secret, subscriptionId: subscription.id });
+    }
+
+    // Payment failed immediately
+    return res.status(402).json({ error: paymentIntent.last_payment_error?.message || 'Payment failed' });
+  } catch (err) {
+    console.error('subscribe-direct error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────
+//  Billing — POST /api/billing/subscribe-confirm
+//  Called after 3DS completes to activate the subscription
+//  Body: { subscriptionId, blocks: ['xai', …] }
+// ──────────────────────────────────────────────
+app.post('/api/billing/subscribe-confirm', requireAuth, async (req, res) => {
+  if (!STRIPE_SECRET_KEY) return res.status(503).json({ error: 'Stripe not configured' });
+  const { subscriptionId, blocks = [] } = req.body || {};
+  if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId required' });
+  const validBlocks = blocks.filter(b => DELUXE_PRICE_IDS[b]);
+  try {
+    await db.setUserPlan(req.user.phone, 'standard', subscriptionId);
+    for (const addonType of validBlocks) {
+      await db.recordAddonPurchase(req.user.phone, addonType, subscriptionId);
+    }
+    res.json({ subscribed: true });
+  } catch (err) {
+    console.error('subscribe-confirm error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 //  Billing — GET /api/billing/prices
 //  Returns live price amounts from Stripe for each plan
 // ──────────────────────────────────────────────
