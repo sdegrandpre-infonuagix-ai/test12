@@ -1061,7 +1061,7 @@ async function checkAddonLimit(userId, addonType) {
 // GET /api/addon/remaining?addonType=xai — remaining minutes for current user
 app.get('/api/addon/remaining', requireAuth, async (req, res) => {
   const { addonType } = req.query;
-  const VALID = ['claude-sonnet', 'xai', 'openai'];
+  const VALID = ['claude-sonnet', 'claude-haiku', 'xai', 'openai'];
   if (!VALID.includes(addonType)) return res.status(400).json({ error: 'Invalid addonType' });
   try {
     const info = await checkAddonLimit(req.user.phone, addonType);
@@ -1339,6 +1339,7 @@ app.post('/api/billing/create-subscription', requireAuth, async (req, res) => {
 const DELUXE_PRICE_IDS = {
   'xai':          process.env.STRIPE_DELUXE_XAI_PRICE_ID,
   'claude-sonnet': process.env.STRIPE_DELUXE_CLAUDE_PRICE_ID,
+  'claude-haiku': process.env.STRIPE_DELUXE_HAIKU_PRICE_ID,
   'openai':       process.env.STRIPE_DELUXE_OPENAI_PRICE_ID,
 };
 
@@ -1427,7 +1428,7 @@ app.post('/api/billing/create-checkout-multi', requireAuth, async (req, res) => 
 // ──────────────────────────────────────────────
 app.post('/api/addon/session/start', requireAuth, async (req, res) => {
   const { addonType } = req.body || {};
-  const VALID = ['claude-sonnet', 'xai', 'openai'];
+  const VALID = ['claude-sonnet', 'claude-haiku', 'xai', 'openai'];
   if (!VALID.includes(addonType)) return res.status(400).json({ error: 'Invalid addonType' });
   const limit = await checkAddonLimit(req.user.phone, addonType).catch(() => null);
   if (limit?.exceeded) {
