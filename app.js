@@ -1177,10 +1177,25 @@ app.post('/api/claude-chat', requireAuth, async (req, res) => {
     }
     // Get follow-up reply after tool call
     const assistantMsg = { role: 'assistant', content: claudeData.content };
-    const toolResults = toolUseBlocks.map(tu => ({
-      type: 'tool_result',
-      tool_use_id: tu.id,
-      content: JSON.stringify({ ok: true, note: 'Tool executed on client.' }),
+    // Build tool results — execute channel-list tools server-side so Claude sees real data
+    const toolResults = await Promise.all(toolUseBlocks.map(async tu => {
+      let content = JSON.stringify({ ok: true, note: 'Tool executed on client.' });
+      const isCreatedTool = tu.name === 'list_private_channels_I_created';
+      const isJoinedTool  = tu.name === 'list_the_private_channels_I_joined';
+      if (isCreatedTool || isJoinedTool) {
+        try {
+          const userProfile = await db.getUserByPhone(req.user.phone).catch(() => null);
+          const displayName = userProfile?.displayName || '';
+          const ids = await db.getUserChannelIds(req.user.phone);
+          const all = (await Promise.all(ids.map(id => db.getChannelById(id).catch(() => null)))).filter(Boolean);
+          const isCreator = ch => ch.created_by === req.user.phone || ch.created_by === displayName;
+          const chs = isCreatedTool ? all.filter(isCreator) : all.filter(ch => !isCreator(ch));
+          content = JSON.stringify({
+            channels: chs.map(ch => ({ id: ch.id, name: ch.name, created_by: ch.created_by }))
+          });
+        } catch (e) { content = JSON.stringify({ error: e.message }); }
+      }
+      return { type: 'tool_result', tool_use_id: tu.id, content };
     }));
     messages.push(assistantMsg, { role: 'user', content: toolResults });
 

@@ -396,6 +396,37 @@ function registerTools(server, z) {
     }
   );
 
+  // ── Public Channel ──
+
+  server.tool(
+    'join_public_channel',
+    'Switch the view back to the public channel feed to read or post public messages.',
+    {},
+    async () => {
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, channel: 'public' }) }] };
+    }
+  );
+
+  // ── My Private Channels ──
+
+  server.tool(
+    'list_private_channels_I_created',
+    'List private channels the current user created. Returns each channel\'s id (short alphanumeric code) and name. Use the id for send_channel_message or read_channel_messages.',
+    {},
+    async () => {
+      return { content: [{ type: 'text', text: JSON.stringify({ channels: [], note: 'Executed server-side.' }) }] };
+    }
+  );
+
+  server.tool(
+    'list_the_private_channels_I_joined',
+    'List private channels the current user joined but did not create. Returns each channel\'s id (short alphanumeric code) and name.',
+    {},
+    async () => {
+      return { content: [{ type: 'text', text: JSON.stringify({ channels: [], note: 'Executed server-side.' }) }] };
+    }
+  );
+
   // ── Alias Tools ──
 
   server.tool(

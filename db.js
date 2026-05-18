@@ -158,7 +158,7 @@ async function createChannel({ id, name, createdBy, maxUsers = 2 }) {
 async function getChannelById(id) {
   if (!doc) throw new Error('Database not connected');
   const r = await doc.send(new GetCommand({
-    TableName: TABLE, Key: { pk: 'CHANNEL', sk: String(id) },
+    TableName: TABLE, Key: { pk: 'CHANNEL', sk: String(id) }, ConsistentRead: true,
   }));
   if (!r.Item) return null;
   const i = r.Item;
