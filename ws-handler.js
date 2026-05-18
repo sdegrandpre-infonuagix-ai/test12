@@ -6,7 +6,7 @@
  * Routes:
  *   $connect     — Store connection in DynamoDB, enforce max 2 users per channel
  *   $disconnect  — Remove connection from DynamoDB
- *   sendmessage  — Receive a message, store in MySQL, broadcast to channel
+ *   sendmessage  — Receive a message, store in DynamoDB, broadcast to channel
  */
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
@@ -193,7 +193,7 @@ async function handleSendMessage(event, connectionId, endpoint) {
 
   await ensureDb();
 
-  // Store message in MySQL
+  // Store message in DynamoDB
   const msg = await db.insertChannelMessage({ channelId, author, text });
 
   // Broadcast to all connections in channel

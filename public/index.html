@@ -1079,27 +1079,46 @@ function onLoggedIn() {
   }
   // Reload channels with auth
   loadPrivateChannels();
-  // Show existing aliases
-  renderAliasPanel();
+  // Load aliases from server then render panel
+  aliasLoad().then(renderAliasPanel);
 }
 
 // ═══════════════════════════════════════════════════
-//  Alias System (client-side, localStorage)
+//  Alias System (server-side, DynamoDB via /api/aliases)
 // ═══════════════════════════════════════════════════
-function getAliases() {
-  try { return JSON.parse(localStorage.getItem('userAliases') || '{}'); }
-  catch(_) { return {}; }
+let aliasCache = {}; // in-memory cache populated after login
+
+async function aliasLoad() {
+  try {
+    const r = await fetch('/api/aliases', { headers: authHeaders() });
+    if (!r.ok) return;
+    const data = await r.json();
+    aliasCache = data.aliases || {};
+  } catch (_) {}
 }
-function setAlias(username, alias) {
-  const a = getAliases(); a[username] = alias;
-  localStorage.setItem('userAliases', JSON.stringify(a));
+
+async function aliasSet(username, alias) {
+  aliasCache[username] = alias; // optimistic
   reRenderAllPosts();
+  await fetch('/api/aliases', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ username, alias }),
+  });
 }
-function removeAlias(username) {
-  const a = getAliases(); delete a[username];
-  localStorage.setItem('userAliases', JSON.stringify(a));
+
+async function aliasRemove(username) {
+  delete aliasCache[username]; // optimistic
   reRenderAllPosts();
+  await fetch(`/api/aliases/${encodeURIComponent(username)}`, {
+    method: 'DELETE', headers: authHeaders(),
+  });
 }
+
+// Sync wrappers for inline onclick= handlers
+function getAliases() { return aliasCache; }
+function setAlias(username, alias) { aliasSet(username, alias); }
+function removeAlias(username) { aliasRemove(username); }
 function renderUsername(username) {
   const a = getAliases();
   return a[username] ? `<span title="${username}" style="cursor:help">${a[username]}</span>` : username;
@@ -1603,6 +1622,9 @@ const MCP_TOOLS_SCHEMA = [
   { name: 'join_private_channel', description: 'Join an existing private channel by ID.', parameters: { type: 'object', properties: { channel_id: { type: 'string' }, author: { type: 'string' } }, required: ['channel_id', 'author'] } },
   { name: 'send_channel_message', description: 'Send a message to the active private channel.', parameters: { type: 'object', properties: { channel_id: { type: 'string' }, author: { type: 'string' }, text: { type: 'string' } }, required: ['channel_id', 'author', 'text'] } },
   { name: 'read_channel_messages', description: 'Read recent messages from a private channel.', parameters: { type: 'object', properties: { channel_id: { type: 'string' } }, required: ['channel_id'] } },
+  { name: 'list_aliases', description: 'List all nickname aliases saved for this account.', parameters: { type: 'object', properties: {}, required: [] } },
+  { name: 'set_alias', description: 'Save a nickname so a username shows a friendlier name everywhere.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Raw username e.g. WOLF.PX7K3A' }, alias: { type: 'string', description: 'Friendly nickname to display' } }, required: ['username', 'alias'] } },
+  { name: 'remove_alias', description: 'Remove a saved nickname alias by username.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Username whose alias to remove' } }, required: ['username'] } },
 ];
 
 // ── Claude Haiku dispatcher (Standard plan — /api/claude-chat) ──
@@ -1638,6 +1660,14 @@ async function dispatchWithClaude(transcript) {
         }
         if (tc.name === 'send_channel_message' || tc.name === 'read_channel_messages') {
           if (activeChannelId && activeChannelId !== 'public') loadChannelMessages(activeChannelId);
+        }
+        // ── Alias tools — call /api/aliases directly ──
+        if (tc.name === 'list_aliases') { await aliasLoad(); renderAliasPanel(); }
+        if (tc.name === 'set_alias' && tc.input?.username && tc.input?.alias) {
+          await aliasSet(tc.input.username.trim(), tc.input.alias.trim()); renderAliasPanel();
+        }
+        if (tc.name === 'remove_alias' && tc.input?.username) {
+          await aliasRemove(tc.input.username.trim()); renderAliasPanel();
         }
       } catch (toolErr) {
         log('error', `Tool ${tc.name} failed: ${toolErr.message}`);

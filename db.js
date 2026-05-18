@@ -517,6 +517,39 @@ async function clearActiveSession(phone) {
 
 // ══════════════════════════════════════════
 
+// ════════════════════════════════════════════
+//  Aliases  (per authenticated user, stored in DynamoDB)
+//  pk: ALIAS#<userId>   sk: <target-username>
+// ════════════════════════════════════════════
+
+async function getAliases(userId) {
+  if (!doc) throw new Error('Database not connected');
+  const r = await doc.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'pk = :pk',
+    ExpressionAttributeValues: { ':pk': `ALIAS#${userId}` },
+  }));
+  // Return as plain object { username: alias } for easy consumption
+  const map = {};
+  for (const item of (r.Items || [])) map[item.sk] = item.alias;
+  return map;
+}
+
+async function setAlias(userId, username, alias) {
+  if (!doc) throw new Error('Database not connected');
+  await doc.send(new PutCommand({
+    TableName: TABLE,
+    Item: { pk: `ALIAS#${userId}`, sk: username, alias, updatedAt: new Date().toISOString() },
+  }));
+}
+
+async function removeAlias(userId, username) {
+  if (!doc) throw new Error('Database not connected');
+  await doc.send(new DeleteCommand({
+    TableName: TABLE, Key: { pk: `ALIAS#${userId}`, sk: username },
+  }));
+}
+
 module.exports = {
   init, isReady, getLastError, MAX_LEVEL,
   insertPost, listPosts, getPostById,
@@ -532,4 +565,6 @@ module.exports = {
   logUsage, getUsageSummary,
   // Realtime session guard
   setActiveSession, getActiveSession, clearActiveSession,
+  // Aliases
+  getAliases, setAlias, removeAlias,
 };

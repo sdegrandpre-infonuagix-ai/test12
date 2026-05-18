@@ -4,9 +4,9 @@
   "description": "WebMCP-compliant audio-only web browser powered by xAI Grok STT & TTS",
   "main": "server.js",
   "scripts": {
-    "start":  "node server.js",
-    "web":    "node web.js",
-    "dev":    "node web.js",
+    "start": "node server.js",
+    "web": "node web.js",
+    "dev": "node web.js",
     "dev:ui": "node dev.js"
   },
   "bin": {
@@ -27,6 +27,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "form-data": "^4.0.5",
+    "google-auth-library": "^10.6.2",
     "jsdom": "^25.0.0",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.22.3",

@@ -395,6 +395,45 @@ function registerTools(server, z) {
       return { content: [{ type: 'text', text: JSON.stringify({ channel: { id: channel.id, name: channel.name }, messages }, null, 2) }] };
     }
   );
+
+  // ── Alias Tools ──
+
+  server.tool(
+    'list_aliases',
+    'List all nickname aliases saved for a user (maps raw usernames to friendly display names).',
+    { userId: z.string().describe('The authenticated user ID (phone or email)') },
+    async ({ userId }) => {
+      if (!db.isReady()) throw new Error('Database not connected');
+      const aliases = await db.getAliases(userId);
+      const entries = Object.entries(aliases).map(([username, alias]) => ({ username, alias }));
+      return { content: [{ type: 'text', text: JSON.stringify({ aliases: entries, count: entries.length }) }] };
+    }
+  );
+
+  server.tool(
+    'set_alias',
+    'Save a nickname alias so a username is displayed with a friendlier name.',
+    { userId: z.string().describe('The authenticated user ID'),
+      username: z.string().max(120).describe('The raw username to alias (e.g. WOLF.PX7K3A)'),
+      alias: z.string().max(120).describe('The friendly nickname to display instead') },
+    async ({ userId, username, alias }) => {
+      if (!db.isReady()) throw new Error('Database not connected');
+      await db.setAlias(userId, username.trim(), alias.trim());
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, username, alias }) }] };
+    }
+  );
+
+  server.tool(
+    'remove_alias',
+    'Remove a saved nickname alias by username.',
+    { userId: z.string().describe('The authenticated user ID'),
+      username: z.string().describe('The username whose alias should be removed') },
+    async ({ userId, username }) => {
+      if (!db.isReady()) throw new Error('Database not connected');
+      await db.removeAlias(userId, username.trim());
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, username }) }] };
+    }
+  );
 }
 
 module.exports = { registerTools, db };

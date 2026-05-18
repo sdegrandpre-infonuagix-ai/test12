@@ -7,6 +7,7 @@ const { Readability } = require('@mozilla/readability');
 const fetch = require('node-fetch');
 const path = require('path');
 const db = require('./db');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -15,6 +16,9 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 if (!XAI_API_KEY) {
   console.warn('WARNING: XAI_API_KEY not set — Deluxe voice features disabled');
@@ -23,7 +27,10 @@ if (!ANTHROPIC_API_KEY) {
   console.warn('WARNING: ANTHROPIC_API_KEY not set — Claude LLM features disabled');
 }
 
-app.use(cors());
+const ALLOWED_ORIGINS = process.env.BASE_URL
+  ? [process.env.BASE_URL, 'http://localhost:3000']
+  : true; // allow all in local dev when BASE_URL unset
+app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -61,7 +68,7 @@ async function requireDeluxe(req, res, next) {
 //  STT Proxy — POST /api/stt
 //  Accepts audio blob, forwards to xAI /v1/stt
 // ──────────────────────────────────────────────
-app.post('/api/stt', requireDeluxe, upload.single('file'), async (req, res) => {
+app.post('/api/stt', requireAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
@@ -621,16 +628,8 @@ app.post('/api/voice-posts', async (req, res) => {
 // ──────────────────────────────────────────────
 //  Voice Posts — GET /api/voice-posts
 // ──────────────────────────────────────────────
-app.get('/api/debug', async (req, res) => {
-  try {
-    const secretArn = process.env.DB_SECRET_ARN;
-    const client = new (require('@aws-sdk/client-secrets-manager').SecretsManagerClient)({ region: "us-east-1" });
-    const response = await client.send(new (require('@aws-sdk/client-secrets-manager').GetSecretValueCommand)({ SecretId: secretArn }));
-    res.json({ secretString: response.SecretString });
-  } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
-  }
-});
+
+
 
 app.get('/api/voice-posts', async (req, res) => {
   if (!db.isReady()) {
@@ -811,6 +810,73 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   } catch (err) {
     console.error('verify-otp error:', err);
     res.status(500).json({ error: 'Verification failed', details: err.message });
+  }
+});
+
+// POST /api/auth/google  — verify Google credential (ID token OR auth code)
+app.post('/api/auth/google', async (req, res) => {
+  if (!googleClient) return res.status(503).json({ error: 'Google login not configured' });
+  const { credential, code } = req.body || {};
+  try {
+    let email, name;
+    if (credential) {
+      // ID token path (One Tap legacy)
+      const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
+      const p = ticket.getPayload();
+      email = p.email; name = p.name;
+    } else if (code) {
+      // Authorization code path (initCodeClient popup)
+      // For GIS popup mode, redirect_uri must be 'postmessage'
+      const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, 'postmessage');
+      const { tokens } = await oauthClient.getToken(code);
+
+      const ticket = await oauthClient.verifyIdToken({ idToken: tokens.id_token, audience: GOOGLE_CLIENT_ID });
+      const p = ticket.getPayload();
+      email = p.email; name = p.name;
+    } else {
+      return res.status(400).json({ error: 'credential or code required' });
+    }
+    if (!email) return res.status(400).json({ error: 'No email from Google' });
+    const user = await db.getOrCreateUser(email);
+    const token = await db.createSession(email);
+    res.json({ token, identifier: email, displayName: user.displayName || name || '' });
+  } catch (err) {
+    console.error('google-auth error:', err);
+    res.status(401).json({ error: 'Google authentication failed' });
+  }
+});
+
+// POST /api/auth/apple  — verify Apple identity token, return session
+app.post('/api/auth/apple', async (req, res) => {
+  const { id_token, user: appleUser } = req.body || {};
+  if (!id_token) return res.status(400).json({ error: 'id_token required' });
+  try {
+    // Fetch Apple’s public keys
+    const keysRes = await fetch('https://appleid.apple.com/auth/keys');
+    const { keys } = await keysRes.json();
+    // Decode header to find the right key
+    const [headerB64] = id_token.split('.');
+    const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
+    const jwk = keys.find(k => k.kid === header.kid);
+    if (!jwk) return res.status(401).json({ error: 'Apple key not found' });
+    // Build PEM from JWK
+    const { createPublicKey } = require('crypto');
+    const pubKey = createPublicKey({ key: jwk, format: 'jwk' });
+    const pem = pubKey.export({ type: 'spki', format: 'pem' });
+    // Verify JWT
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(id_token, pem, { algorithms: ['RS256'] });
+    const email = decoded.email || (appleUser && appleUser.email);
+    if (!email) return res.status(400).json({ error: 'No email from Apple' });
+    const user = await db.getOrCreateUser(email);
+    const token = await db.createSession(email);
+    const displayName = (appleUser?.name)
+      ? `${appleUser.name.firstName || ''} ${appleUser.name.lastName || ''}`.trim()
+      : (user.displayName || '');
+    res.json({ token, identifier: email, displayName });
+  } catch (err) {
+    console.error('apple-auth error:', err);
+    res.status(401).json({ error: 'Apple token verification failed' });
   }
 });
 
@@ -1034,7 +1100,11 @@ const TEST12_SYSTEM_PROMPT =
   + 'Keep all replies under 30 words — they will be spoken aloud by text-to-speech. '
   + 'Never use markdown, bullet points, or code blocks. '
   + 'Always respond in the same language the user spoke in. '
-  + 'Use the provided tools to fulfill requests. After a tool call, confirm briefly what was done.';
+  + 'Use the provided tools to fulfill requests. After a tool call, confirm briefly what was done. '
+  + 'IMPORTANT: You do NOT have a contacts directory. You cannot look up users by display name or alias. '
+  + 'To invite someone to a channel you need their phone number or email. '
+  + 'If the user mentions a name you do not have contact info for, say exactly: "I don\'t have contact information for [name]. Please provide their phone number or email." '
+  + 'Never pretend to search for or add a contact you were not explicitly given.';
 
 app.post('/api/claude-chat', requireAuth, async (req, res) => {
   if (!ANTHROPIC_API_KEY) return res.status(503).json({ error: 'Claude API not configured' });
@@ -1296,6 +1366,40 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
 });
 
 // ──────────────────────────────────────────────
+//  Aliases — GET/POST/DELETE /api/aliases
+//  Scoped to the authenticated user; stored in DynamoDB.
+// ──────────────────────────────────────────────
+app.get('/api/aliases', requireAuth, async (req, res) => {
+  try {
+    const aliases = await db.getAliases(req.user.phone);
+    res.json({ aliases });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/aliases', requireAuth, async (req, res) => {
+  const { username, alias } = req.body || {};
+  if (!username || !alias) return res.status(400).json({ error: 'username and alias required' });
+  if (username.length > 120 || alias.length > 120) return res.status(400).json({ error: 'username and alias must be ≤ 120 chars' });
+  try {
+    await db.setAlias(req.user.phone, username.trim(), alias.trim());
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/aliases/:username', requireAuth, async (req, res) => {
+  try {
+    await db.removeAlias(req.user.phone, req.params.username);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 //  Admin — GET /api/admin/usage
 //  Returns usage summary for a specific user (admin only via secret header)
 // ──────────────────────────────────────────────
@@ -1317,6 +1421,17 @@ app.get('/api/admin/usage', async (req, res) => {
 app.get('/upgrade', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'upgrade.html'));
 });
+
+// ── /config.js — expose public OAuth IDs to the browser ──
+app.get('/config.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(
+    `window.GOOGLE_CLIENT_ID = ${JSON.stringify(process.env.GOOGLE_CLIENT_ID || '')};\n` +
+    `window.APPLE_SERVICE_ID = ${JSON.stringify(process.env.APPLE_SERVICE_ID || '')};\n`
+  );
+});
+
 // ──────────────────────────────────────────────
 //  Fallback — serve index.html (voice agent landing page)
 // ──────────────────────────────────────────────
