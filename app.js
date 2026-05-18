@@ -72,40 +72,41 @@ async function requireDeluxe(req, res, next) {
 //  STT Proxy — POST /api/stt
 //  Accepts audio blob, forwards to xAI /v1/stt
 // ──────────────────────────────────────────────
-app.post('/api/stt', requireAuth, upload.single('file'), async (req, res) => {
+app.post('/api/stt', requireAuth, async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No audio file provided' });
+    // Accept either base64 JSON body { audio: '<base64>', type: 'audio/webm' }
+    // or legacy multipart (upload.single handled before this middleware)
+    let audioBuffer, mimeType;
+
+    if (req.body?.audio) {
+      // Base64 JSON path (preferred for Lambda/API Gateway)
+      audioBuffer = Buffer.from(req.body.audio, 'base64');
+      mimeType = (req.body.type || 'audio/webm').split(';')[0].trim();
+    } else if (req.file) {
+      audioBuffer = req.file.buffer;
+      mimeType = (req.file.mimetype || 'audio/webm').split(';')[0].trim();
+    } else {
+      return res.status(400).json({ error: 'No audio provided' });
     }
 
-    // Normalize mime type — strip codec suffix (e.g. audio/webm;codecs=opus → audio/webm)
-    const rawMime = (req.file.mimetype || 'audio/webm').split(';')[0].trim();
-    const ext = rawMime.includes('ogg') ? 'ogg' : rawMime.includes('mp4') ? 'mp4' : 'webm';
-
+    const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
     const formData = new (require('form-data'))();
-    formData.append('file', req.file.buffer, {
-      filename: `audio.${ext}`,
-      contentType: rawMime,
-    });
+    formData.append('file', audioBuffer, { filename: `audio.${ext}`, contentType: mimeType });
     formData.append('model', 'grok-stt');
 
     const response = await fetch('https://api.x.ai/v1/stt', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${XAI_API_KEY}`,
-        ...formData.getHeaders(),
-      },
+      headers: { 'Authorization': `Bearer ${XAI_API_KEY}`, ...formData.getHeaders() },
       body: formData,
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('xAI STT error:', response.status, errText, '| mime:', rawMime, '| size:', req.file.buffer.length);
+      console.error('xAI STT error:', response.status, errText, '| mime:', mimeType, '| size:', audioBuffer.length);
       return res.status(response.status).json({ error: `STT API error: ${response.status}`, details: errText });
     }
 
-    const data = await response.json();
-    res.json(data);
+    res.json(await response.json());
   } catch (err) {
     console.error('STT proxy error:', err);
     res.status(500).json({ error: 'STT processing failed', details: err.message });

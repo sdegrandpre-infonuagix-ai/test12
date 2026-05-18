@@ -826,7 +826,7 @@
       <button id="logout-btn" class="header-login-link" style="position:static;">Sign out</button>
     </div>
     <p>
-      Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, reply to a post, reply to a reply, create private channels and invite a friends through SMS to a private channel. I support 25 languages!
+      Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, create private channels and invite a friends through SMS, change agent to Sonnet, xAI Voice Agent or OpenAI Realtime Agent. All agents support many languages!
     </p>
   </header>
 
@@ -1214,7 +1214,6 @@ verifyBtn.addEventListener('click', async () => {
     if (!d.displayName) {
       stepOtp.style.display = 'none'; stepName.style.display = '';
       if (loginUsernameDisplay) loginUsernameDisplay.textContent = currentUser.displayName || '...';
-      speak('This is Test 1 2, the vocal social network.');
     } else {
       onLoggedIn();
     }
@@ -1289,7 +1288,6 @@ if (newBtn) newBtn.addEventListener('click', async () => {
     const revealPin = document.getElementById('reveal-pin');
     if (revealUid) revealUid.textContent = userId;
     if (revealPin) revealPin.textContent = pin;
-    speak('This is Test 1 2, the vocal social network.');
   } catch (e) {
     if (stepCreating) stepCreating.style.display = 'none';
     if (stepPin) stepPin.style.display = '';
@@ -1304,7 +1302,7 @@ if (revealBtn) revealBtn.addEventListener('click', () => {
 });
 
 if (logoutBtn) logoutBtn.addEventListener('click', async () => {
-  speak('Signing out. Goodbye!');
+  sessionStorage.removeItem('welcomeSpoken');
   await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
   clearAuthSession();
   profileBadge.style.display = 'none';
@@ -1330,7 +1328,6 @@ function onLoggedIn() {
   if (currentUser.phone) saveProfileToHistory(currentUser.phone, currentUser.displayName);
   // Save USERID to datalist history
   if (currentUser.displayName) saveUidToHistory(currentUser.displayName);
-  speak('This is Test 1 2, the vocal social network.');
   // Fetch full profile (includes plan tier and deluxeType)
   fetch('/api/auth/me', { headers: authHeaders() })
     .then(r => r.ok ? r.json() : null)
@@ -1843,23 +1840,32 @@ let ptListening = false;
 
 
 let _ttsAudio = null;
+let _ttsAbort = null;
 async function ptSpeak(text) {
   if (!text || !currentUser) return;
+  // Cancel any in-flight TTS request and stop current playback
+  if (_ttsAbort) { _ttsAbort.abort(); _ttsAbort = null; }
   if (_ttsAudio) { try { _ttsAudio.pause(); } catch(_){} _ttsAudio = null; }
+  const ctrl = new AbortController();
+  _ttsAbort = ctrl;
   try {
     const r = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text }),
+      signal: ctrl.signal
     });
+    if (ctrl.signal.aborted) return;
     if (!r.ok) { console.warn('Grok TTS failed:', r.status); return; }
     const blob = await r.blob();
+    if (ctrl.signal.aborted) return;
     const url = URL.createObjectURL(blob);
     _ttsAudio = new Audio(url);
+    _ttsAbort = null;
     await _ttsAudio.play();
     _ttsAudio.onended = () => { URL.revokeObjectURL(url); _ttsAudio = null; };
   } catch(e) {
-    console.warn('Grok TTS error:', e.message);
+    if (e.name !== 'AbortError') console.warn('Grok TTS error:', e.message);
   }
 }
 
@@ -1877,10 +1883,10 @@ clearBtn.addEventListener('click', () => { logsEl.innerHTML = ''; });
 
 // ── Add-on usage progress bars ──
 const ADDON_BAR_DEFS = [
-  { key: 'claude-haiku',  label: 'Grok3 STT/TTS+Haiku 4.5' },
-  { key: 'claude-sonnet', label: 'Grok3 STT/TTS+Sonnet 4.6' },
-  { key: 'xai',           label: 'xAI Voice Agent'       },
-  { key: 'openai',        label: 'OpenAI Realtime'       },
+  { key: 'claude-haiku',  label: 'Grok3 STT/TTS+Haiku 4.5',  limitMins: 900 },
+  { key: 'claude-sonnet', label: 'Grok3 STT/TTS+Sonnet 4.6', limitMins: 180 },
+  { key: 'xai',           label: 'xAI Voice Agent',           limitMins: 180 },
+  { key: 'openai',        label: 'OpenAI Realtime',           limitMins: 180 },
 ];
 const _aubContainer = document.getElementById('addon-usage-bars');
 
@@ -1891,9 +1897,9 @@ function _fmtMins(m) {
 
 function renderAddonUsageBars(usageMap) {
   if (!_aubContainer) return;
-  _aubContainer.innerHTML = ADDON_BAR_DEFS.map(({ key, label }) => {
+  _aubContainer.innerHTML = ADDON_BAR_DEFS.map(({ key, label, limitMins }) => {
     const u = usageMap[key] || { totalMins: 0, purchasedMins: 0, sessionCount: 0 };
-    const limit = u.purchasedMins > 0 ? u.purchasedMins : ADDON_LIMIT_MINS;
+    const limit = u.purchasedMins > 0 ? u.purchasedMins : (limitMins || ADDON_LIMIT_MINS);
     const used  = Math.min(u.totalMins, limit);
     const pct   = Math.min(100, (used / limit) * 100);
     const fillClass = pct >= 100 ? 'full' : pct / 100 >= 0.83 ? 'warn' : 'ok';
@@ -2064,7 +2070,7 @@ function refreshVAMode() {
     sessionStorage.setItem('welcomeSpoken', '1');
     const name = currentUser?.displayName ? `, ${currentUser.displayName}` : '';
     const welcome =
-      `Test 1 2 — The Vocal Social Network. Welcome${name}! `
+      `Welcome${name}! `
       + `Manage a chatroom vocally. Tap the button, speak naturally — the agent can join the public channel, `
       + `create a private channel, join a private channel with its id, `
       + `invite a friend through SMS to create a profile on Test 1 2 and join a private channel, `
@@ -2090,6 +2096,7 @@ const MCP_TOOLS_SCHEMA = [
   { name: 'set_alias', description: 'Save a nickname so a username shows a friendlier name everywhere.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Raw username e.g. WOLF.PX7K3A' }, alias: { type: 'string', description: 'Friendly nickname to display' } }, required: ['username', 'alias'] } },
   { name: 'remove_alias', description: 'Remove a saved nickname alias by username.', parameters: { type: 'object', properties: { username: { type: 'string', description: 'Username whose alias to remove' } }, required: ['username'] } },
   { name: 'get_addon_usage', description: 'Get voice add-on usage: minutes consumed per 3-hour block product (claude-sonnet, xai, openai). Returns session count, total minutes, and last-used date for each add-on.', parameters: { type: 'object', properties: {}, required: [] } },
+  { name: 'send_invite', description: 'Send a private channel invite to a friend by phone number or SMS. Use this when the user wants to invite someone to a private channel. Always call create_private_channel first if no channel exists yet, then call send_invite with the channel_id.', parameters: { type: 'object', properties: { phone: { type: 'string', description: 'Phone number to send invite to (optional if email provided)' }, email: { type: 'string', description: 'Email address to send invite to (optional if phone provided)' }, channel_id: { type: 'string', description: 'Short alphanumeric channel ID to invite into' }, contact_name: { type: 'string', description: 'Name of the person being invited' }, sender_name: { type: 'string', description: 'Name of the person sending the invite' } }, required: ['channel_id'] } },
 ];
 
 // ── Claude Haiku dispatcher (Standard plan — /api/claude-chat) ──
@@ -2099,7 +2106,8 @@ async function dispatchWithClaude(transcript) {
     `You are a concise voice assistant for Test12, a social voice-posting platform. `
     + `The user's username is "${author}". Active channel: "${activeChannelId || 'public'}". `
     + `Use tools to fulfill the request. Reply in 1-2 SHORT sentences — the reply will be spoken aloud. No markdown. `
-    + `Available voice agent options the user can switch to: Haiku 4.5 (default), Sonnet 4.6, xAI Voice Agent, OpenAI Realtime.`;
+    + `Available voice agent options the user can switch to: Haiku 4.5 (default), Sonnet 4.6, xAI Voice Agent, OpenAI Realtime. `
+    + `To invite a friend: first call create_private_channel (if needed), then call send_invite with the channel_id and the friend's contact details. Never claim an invite was sent without calling send_invite.`;
 
   // Retry up to 3× on 529 (overloaded) or 503
   let resp, lastStatus;
@@ -2141,20 +2149,32 @@ async function dispatchWithClaude(transcript) {
     return;
   }
 
+  let _toolEmptyMsg = null; // set when a tool returns no content
+
   if (data.toolCalls?.length) {
     for (let tc of data.toolCalls) {
       ({ name: tc.name, input: tc.input } = resolveToolForActiveChannel(tc.name, tc.input));
       log('tool', `${tc.name}(${JSON.stringify(tc.input)})`);
       try {
+        // Client-side only tools (send_invite runs in-browser via SMS/share sheet)
+        if (tc.name === 'send_invite') {
+          const inv = tc.input || {};
+          if (!inv.sender_name) inv.sender_name = currentUser?.displayName || 'A friend';
+          await sendInvite(inv);
+          continue;
+        }
         // Only call MCP for tools that run server-side via the MCP endpoint
         const result = REST_ONLY_TOOLS.has(tc.name) ? null : await mcpCall(tc.name, tc.input);
 
         if (tc.name === 'join_public_channel') {
           setActiveChannel('public'); loadPublicPosts();
-          ptSpeak('Switched to the public channel.');
         }
         if (tc.name === 'list_posts' || tc.name === 'create_post') {
           setActiveChannel('public'); loadPublicPosts();
+          if (tc.name === 'list_posts') {
+            const posts = result?.posts || result?.items || result?.data || (Array.isArray(result) ? result : null);
+            if (posts && posts.length === 0) _toolEmptyMsg = 'There are no posts yet in the public channel.';
+          }
         }
         if (tc.name === 'create_private_channel' && result?.channel) {
           const newCh = result.channel;
@@ -2167,7 +2187,7 @@ async function dispatchWithClaude(transcript) {
           await loadPrivateChannels();
           setActiveChannel(newCh.id);
           const idSpoken = newCh.id.split('').join(' ');
-          ptSpeak(`Channel ${newCh.name} created. Your channel ID is ${idSpoken}. You have been joined automatically.`);
+          _toolEmptyMsg = `Channel ${newCh.name} created. Your channel ID is ${idSpoken}.`;
         }
         if (tc.name === 'join_private_channel' && tc.input?.channel_id) {
           const cid = tc.input.channel_id.toUpperCase().replace(/\s+/g, ''); // normalise
@@ -2176,11 +2196,10 @@ async function dispatchWithClaude(transcript) {
             const jd = await jr.json().catch(() => ({}));
             const chName = jd.channel?.name || cid;
             addMyChannelId(cid); setActiveChannel(cid); await loadPrivateChannels();
-            ptSpeak(`You joined ${chName}.`);
           } else {
             const je = await jr.json().catch(() => ({}));
             log('error', `Join failed (${jr.status}): ${je.error || 'Channel not found'}`);
-            ptSpeak('Channel not found. Please check the ID and try again.');
+            _toolEmptyMsg = 'Channel not found. Please check the ID and try again.';
           }
         }
         if (tc.name === 'list_private_channels_I_created' || tc.name === 'list_the_private_channels_I_joined') {
@@ -2188,6 +2207,10 @@ async function dispatchWithClaude(transcript) {
         }
         if (tc.name === 'send_channel_message' || tc.name === 'read_channel_messages') {
           if (activeChannelId && activeChannelId !== 'public') loadChannelMessages(activeChannelId);
+          if (tc.name === 'read_channel_messages') {
+            const msgs = result?.messages || result?.items || result?.data || (Array.isArray(result) ? result : null);
+            if (msgs && msgs.length === 0) _toolEmptyMsg = 'There are no messages in this channel yet.';
+          }
         }
         if (tc.name === 'list_aliases') { await aliasLoad(); renderAliasPanel(); }
         if (tc.name === 'set_alias' && tc.input?.username && tc.input?.alias) {
@@ -2202,7 +2225,7 @@ async function dispatchWithClaude(transcript) {
     }
   }
 
-  const reply = data.text || 'Done.';
+  const reply = data.text || _toolEmptyMsg || 'Done.';
   ptSpeak(reply); log('agent', reply);
 }
 
@@ -2401,15 +2424,11 @@ function updateAgentUI() {
     disconnectBtn.style.display = '';
     disconnectBtn.disabled = true;
     setStatus('Click Connect to start');
-    const modeLabel = VA_MODE === 'deluxe-xai' ? 'xAI Grok-3 realtime voice' : 'OpenAI gpt-realtime-2 voice';
-    log('ws', `<b>Deluxe mode</b> — ${modeLabel} with MCP tools`);
   } else {
     const label = VA_MODE === 'deluxe-claude' ? '🧠 Tap to Speak (Sonnet)' : '🎙️ Tap to speak';
     connectBtn.textContent = label;
     disconnectBtn.style.display = 'none';
     setStatus('Tap to speak');
-    const modeLabel = VA_MODE === 'deluxe-claude' ? 'Grok3 STT/TTS + Claude Sonnet 4.6' : 'Grok3 STT/TTS + Claude Haiku 4.5';
-    log('ws', `<b>${VA_MODE === 'deluxe-claude' ? 'Sonnet' : 'Haiku'} mode</b> — ${modeLabel}`);
   }
 }
 
@@ -2665,13 +2684,16 @@ function updateAgentUI() {
       connectBtn.textContent = '⏳ Processing…'; connectBtn.disabled = true;
 
       const rawMime = (_ptMediaRecorder.mimeType || 'audio/webm').split(';')[0].trim();
-      const ext = rawMime.includes('ogg') ? 'ogg' : rawMime.includes('mp4') ? 'mp4' : 'webm';
       const blob = new Blob(_ptChunks, { type: rawMime });
-      const formData = new FormData();
-      formData.append('file', new File([blob], `audio.${ext}`, { type: rawMime }), `audio.${ext}`);
+      const arrayBuf = await blob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
 
       try {
-        const r = await fetch('/api/stt', { method: 'POST', headers: authHeaders(), body: formData });
+        const r = await fetch('/api/stt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ audio: base64, type: rawMime })
+        });
         if (r.ok) {
           const { text } = await r.json();
           if (text?.trim()) {
