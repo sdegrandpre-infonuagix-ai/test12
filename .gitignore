@@ -5,3 +5,5 @@ node_modules
 dev.local.ps1
 scratch-xai.js
 patch-aliases.js
+.ralph/logs/
+_bmad-output/
