@@ -324,38 +324,7 @@
     .log-body { color: #cbd5e1; word-break: break-word; }
     .log-body b { color: #e2e8f0; font-weight: 600; }
 
-    /* ── Channel panels ── */
-    .channels-section {
-      width: 100%; max-width: 640px;
-      margin: 0 1.5rem 1rem; padding: 0;
-    }
-    .channels-section h2 {
-      font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.08em; color: #64748b; margin-bottom: 0.5rem;
-    }
-    .channel-panel {
-      background: rgba(15,23,42,0.6); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-      border: 2px solid rgba(21, 149, 178,0.35); border-radius: 14px;
-      padding: 1rem 1.25rem; margin-bottom: 0.75rem;
-      cursor: pointer; transition: border-color 0.25s, box-shadow 0.25s, transform 0.15s;
-    }
-    .channel-panel:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(21, 149, 178,0.12); }
-    .channel-panel.active {
-      border-color: #facc15 !important;
-      box-shadow: 0 0 24px rgba(250,204,21,0.15);
-    }
-    .channel-panel .ch-name {
-      font-size: 0.95rem; font-weight: 600; color: #e2e8f0;
-    }
-    .channel-panel .ch-meta {
-      font-size: 0.72rem; color: #64748b; margin-top: 2px;
-    }
-    .channel-panel .ch-id {
-      display: inline-block; background: rgba(99,102,241,0.15);
-      color: #a78bfa; font-size: 0.65rem; font-weight: 600;
-      padding: 2px 8px; border-radius: 6px; letter-spacing: 0.05em;
-      margin-right: 0.5rem;
-    }
+    /* Channels section (.channels-section, .channel-panel, .ch-*) migrated to src/styles/tailwind.css (Story 0.4) */
     .compose-form {
       display: flex; gap: 0.4rem; margin-top: 0.6rem;
       padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);
@@ -373,20 +342,7 @@
       cursor: pointer; white-space: nowrap; font-family: inherit;
     }
     .compose-btn:hover { opacity: 0.88; }
-    .channel-panel .ch-messages {
-      max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
-      margin-top: 0;
-    }
-    .channel-panel.active .ch-messages {
-      max-height: 300px; margin-top: 0.75rem; overflow-y: auto;
-    }
-    .ch-msg {
-      padding: 4px 0; font-size: 0.8rem; color: #94a3b8;
-      border-bottom: 1px solid rgba(148,163,184,0.06);
-    }
-    .ch-msg b { color: #cbd5e1; font-weight: 600; }
-    .ch-msg:last-child { border-bottom: none; }
-    .ch-empty { font-size: 0.75rem; color: #475569; font-style: italic; }
+    /* .ch-messages, .ch-msg (+ b, :last-child), .ch-empty migrated to src/styles/tailwind.css (Story 0.4) */
 
     /* ── Footer ── */
     .powered-footer {
@@ -601,11 +557,11 @@
       html { font-size: clamp(17px, 5vw, 20px); }
       body { font-size: 1rem; }
 
-      /* Tighter gutters so panels fill the screen edge-to-edge */
+      /* Tighter gutters so panels fill the screen edge-to-edge
+       * (.channels-section moved to src/styles/tailwind.css per Story 0.4) */
       header,
       .agent-card,
-      .logs-card,
-      .channels-section { margin-left: 0.4rem; margin-right: 0.4rem; }
+      .logs-card { margin-left: 0.4rem; margin-right: 0.4rem; }
 
       header { padding: 3.8rem 1rem 0.75rem; }
       header h1 { font-size: 1.4rem; }
@@ -629,13 +585,7 @@
       .log-line    { font-size: 0.9rem; line-height: 1.6; }
       .logs-header { font-size: 0.85rem; }
 
-      /* Channel panels */
-      .channel-panel { padding: 0.9rem 1rem; }
-      .channel-panel .ch-name { font-size: 1.05rem; }
-      .channel-panel .ch-meta { font-size: 0.82rem; }
-      .channel-panel .ch-id   { font-size: 0.76rem; }
-      .ch-msg   { font-size: 0.92rem; line-height: 1.55; }
-      .ch-empty { font-size: 0.85rem; }
+      /* Channel panels mobile overrides migrated to src/styles/tailwind.css (Story 0.4) */
       .compose-input { font-size: 1rem; padding: 0.6rem 0.9rem; }
       .compose-btn   { font-size: 1rem; padding: 0.6rem 1rem; }
 

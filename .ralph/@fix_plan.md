@@ -8,12 +8,7 @@
 - [x] Story 0.1: Add Tailwind build pipeline
 - [x] Story 0.2: Configure Tailwind theme with existing brand tokens
 - [x] Story 0.3: Migrate header chrome to Tailwind utilities
-  > As a **test12 user**
-  > I want **the header (login link, profile, sign-out buttons, addon-usage-bars) to look and behave identically after migration**
-  > So that **I see no visual change but the codebase has been moved off inline CSS for the header region**.
-  > AC: Given the existing `.header-login-link`, `#header-auth-btns`, `#addon-usage-bars` and related rules in the `<style>` block, When these styles are migrated to Tailwind utilities applied directly in the HTML (with `@apply`-composed `header-login-link` component class if reuse warrants), Then the rendered header in production is pixel-identical to the pre-migration state (verified by side-by-side screenshot on iPhone, iPad, desktop), And the `<style>`-block rules for these elements are removed, And all hover/focus/active interaction states still behave identically, And the inline `data-key="key"` addon-usage-bar rendering logic (from `index.html:1966+`) continues to update progress bars correctly
-  > Spec: specs/planning-artifacts/epics.md#story-0-3
-- [ ] Story 0.4: Migrate channels section to Tailwind utilities
+- [x] Story 0.4: Migrate channels section to Tailwind utilities
   > As a **test12 user**
   > I want **the public-channel and private-channels sections to look identical after migration**
   > So that **posting, reading, and channel navigation are visually unchanged**.

@@ -65,8 +65,66 @@
   }
 }
 
-/* Mobile overrides for the migrated header chrome — was previously
- * inside the inline <style>'s @media (max-width: 768px) block. */
+/* ═══════════════════════════════════════════════════
+ *  Story 0.4 — Channels section migrated from inline <style>
+ *  Classes: .channels-section (+ h2), .channel-panel (+ :hover, .active),
+ *           .ch-name / .ch-meta / .ch-id / .ch-messages / .ch-msg (+ b,
+ *           :last-child) / .ch-empty.
+ *  Class names preserved so setActiveChannel() (which toggles .active
+ *  via classList) and querySelector('.ch-empty') keep working.
+ * ═══════════════════════════════════════════════════ */
+@layer components {
+  .channels-section {
+    @apply w-full max-w-[640px] p-0;
+    margin: 0 1.5rem 1rem;
+  }
+  .channels-section h2 {
+    @apply text-[0.75rem] font-semibold uppercase tracking-[0.08em]
+           text-text-muted mb-[0.5rem];
+  }
+  .channel-panel {
+    @apply bg-[rgba(15,23,42,0.6)] backdrop-blur-[16px]
+           border-2 border-[rgba(21,149,178,0.35)] rounded-[14px]
+           px-[1.25rem] py-[1rem] mb-[0.75rem] cursor-pointer;
+    -webkit-backdrop-filter: blur(16px);
+    transition: border-color 0.25s, box-shadow 0.25s, transform 0.15s;
+  }
+  .channel-panel:hover {
+    @apply shadow-hover;
+    transform: translateY(-1px);
+  }
+  .channel-panel.active {
+    @apply !border-[#facc15] shadow-[0_0_24px_rgba(250,204,21,0.15)];
+  }
+  .channel-panel .ch-name {
+    @apply text-[0.95rem] font-semibold text-text-primary;
+  }
+  .channel-panel .ch-meta {
+    @apply text-[0.72rem] text-text-muted mt-[2px];
+  }
+  .channel-panel .ch-id {
+    @apply inline-block bg-[rgba(99,102,241,0.15)] text-[#a78bfa]
+           text-[0.65rem] font-semibold px-[8px] py-[2px] rounded-md
+           tracking-[0.05em] mr-[0.5rem];
+  }
+  .channel-panel .ch-messages {
+    @apply max-h-0 overflow-hidden mt-0;
+    transition: max-height 0.35s ease;
+  }
+  .channel-panel.active .ch-messages {
+    @apply max-h-[300px] mt-[0.75rem] overflow-y-auto;
+  }
+  .ch-msg {
+    @apply px-0 py-[4px] text-[0.8rem] text-[#94a3b8]
+           border-b border-[rgba(148,163,184,0.06)];
+  }
+  .ch-msg b { @apply text-[#cbd5e1] font-semibold; }
+  .ch-msg:last-child { @apply border-b-0; }
+  .ch-empty { @apply text-[0.75rem] text-[#475569] italic; }
+}
+
+/* Mobile overrides for the migrated header chrome + channels section —
+ * was previously inside the inline <style>'s @media (max-width: 768px) block. */
 @media (max-width: 768px) {
   .aub-label { font-size: 0.78rem; }
   .aub-mins  { font-size: 0.78rem; width: 6.2rem; }
@@ -77,4 +135,12 @@
     font-size: 0.9rem;
     padding: 8px 14px;
   }
+
+  .channels-section { margin-left: 0.4rem; margin-right: 0.4rem; }
+  .channel-panel { padding: 0.9rem 1rem; }
+  .channel-panel .ch-name { font-size: 1.05rem; }
+  .channel-panel .ch-meta { font-size: 0.82rem; }
+  .channel-panel .ch-id   { font-size: 0.76rem; }
+  .ch-msg   { font-size: 0.92rem; line-height: 1.55; }
+  .ch-empty { font-size: 0.85rem; }
 }
