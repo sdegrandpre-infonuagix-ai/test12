@@ -10,12 +10,7 @@
 - [x] Story 0.3: Migrate header chrome to Tailwind utilities
 - [x] Story 0.4: Migrate channels section to Tailwind utilities
 - [x] Story 0.5: Migrate compose form, orb, and agent-card to Tailwind utilities
-  > As a **test12 user**
-  > I want **the agent card, orb animation, connect/disconnect buttons, and compose forms to look and behave identically**
-  > So that **the voice-flow UI (the primary user surface) is visually unchanged**.
-  > AC: Given `.agent-card`, `.orb`, `.orb-ring`, `.btn`, `.btn-primary`, `.btn-danger`, `.btn-ghost`, `.compose-form`, `.compose-input`, `.compose-btn`, `#status`, `#logs`, `#text-prompt-form`, `#text-prompt-input`, `#text-prompt-send`, `.aliases-section`, When these styles are migrated to Tailwind utilities, Then the agent card and orb pulse animation render identically (including `connecting` state, transition timings), And Connect/Disconnect/text-input/text-send buttons render and behave identically, And the compose form for the public-channel posts identically, And the typed-text fallback flow still works
-  > Spec: specs/planning-artifacts/epics.md#story-0-5
-- [ ] Story 0.6: Migrate auth modal, PWA banner, body background to Tailwind utilities
+- [x] Story 0.6: Migrate auth modal, PWA banner, body background to Tailwind utilities
   > As a **test12 user**
   > I want **the auth modal (Login/OTP), PWA install banner, and ambient body background to look identical**
   > So that **the auth and PWA-install flows are visually unchanged**.
