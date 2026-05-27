@@ -2674,7 +2674,7 @@ function updateAgentUI() {
       if (!res.ok) {
         const err = await res.json().catch(()=>({}));
         if (res.status === 402) {
-          log('error', '⏱️ Deluxe pass expired. <a href="/upgrade">Buy another 3-hour pass →</a>');
+          log('error', '⏱️ Deluxe pass expired. <a href="#" onclick="event.preventDefault();openProfileModal();">Buy another 3-hour pass →</a>');
           setStatus('Pass expired'); connectBtn.disabled=false; return;
         }
         throw new Error(err.message || `Session token failed: ${res.status}`);
@@ -2757,7 +2757,7 @@ function updateAgentUI() {
         rtCleanup();
         // Token expired (1001/1008) — inform user, no auto-reconnect
         if (ev.code === 1001 || ev.code === 1008 || ev.code === 4000) {
-          log('ws','⏱️ Session time limit reached. <a href="/upgrade">Buy a new pass →</a>');
+          log('ws','⏱️ Session time limit reached. <a href="#" onclick="event.preventDefault();openProfileModal();">Buy a new pass →</a>');
           setStatus('Session ended');
         }
       };
@@ -2921,7 +2921,7 @@ async function sendInvite({ phone, email, use_whatsapp, channel_id, contact_name
   // Ensure no whitespace in channel ID
   const cleanChannelId = String(channel_id).trim();
   const baseUrl = window.location.origin;
-  const standardUrl = `${baseUrl}/private/${cleanChannelId}`;
+  const standardUrl = `${baseUrl}/?private_channel_id=${cleanChannelId}`;
   const voiceUrl = `${baseUrl}/?private_channel_id=${cleanChannelId}&username=${encodeURIComponent(name)}`;
 
   const textBody = `Hey ${name}! ${sender} invited you to a private voice channel on Test12.\n\n`

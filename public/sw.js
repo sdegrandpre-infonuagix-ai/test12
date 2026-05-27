@@ -7,7 +7,7 @@
 // ═══════════════════════════════════════════
 'use strict';
 
-const CACHE_VERSION = 'test12-v4';
+const CACHE_VERSION = 'test12-v5';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',

@@ -62,8 +62,8 @@ async function requireDeluxe(req, res, next) {
   }
   return res.status(402).json({
     error: 'Deluxe access required',
-    upgrade_url: '/upgrade',
-    message: 'Purchase a 3-hour Deluxe pass at test12.net/upgrade.',
+    upgrade_url: '/?upgrade=1',
+    message: 'Purchase a 3-hour Deluxe pass — open your Profile to buy.',
   });
 }
 
@@ -606,81 +606,6 @@ app.post('/api/parse-post', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
-//  Match Reply Target — POST /api/match-reply-target
-//  Body: { text, candidates: [{ id, author, text, level }] }
-//  Returns: { id, confidence, reason } — id is null if no confident match
-// ──────────────────────────────────────────────
-app.post('/api/match-reply-target', async (req, res) => {
-  try {
-    const text = (req.body?.text || '').toString().trim();
-    const candidates = Array.isArray(req.body?.candidates) ? req.body.candidates : [];
-    if (!text) return res.status(400).json({ error: 'text is required' });
-    if (candidates.length === 0) {
-      return res.json({ id: null, confidence: 0, reason: 'no candidates' });
-    }
-
-    // Trim payload to keep prompts compact and predictable
-    const safeCandidates = candidates.slice(0, 50).map((c) => ({
-      id: c?.id,
-      author: (c?.author || '').toString().slice(0, 120),
-      text: (c?.text || '').toString().slice(0, 240),
-      level: Number(c?.level) || 1,
-    }));
-
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${XAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'grok-3-mini',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You match a user\'s spoken utterance to the post they want to reply to. '
-              + 'Return ONLY a strict JSON object of the form: {"id": <id-or-null>, "confidence": <number 0..1>, "reason": "<short>"}. '
-              + 'Rules:\n'
-              + '- "id" must be the exact id from one of the candidates, or null if no candidate is a confident match.\n'
-              + '- Match on author name, key words from the post text, or ordinal references (e.g. "the first one", "post 2").\n'
-              + '- If multiple candidates plausibly match, pick the most likely one and lower the confidence.\n'
-              + '- Set "confidence" below 0.5 if the match is weak; the caller will treat low confidence as no-match.\n'
-              + '- Keep "reason" under 12 words.',
-          },
-          {
-            role: 'user',
-            content: JSON.stringify({ utterance: text, candidates: safeCandidates }),
-          },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      return res.status(response.status).json({ error: err });
-    }
-
-    const data = await response.json();
-    let parsed = { id: null, confidence: 0, reason: '' };
-    try { parsed = JSON.parse(data.choices[0].message.content); } catch (_) {}
-
-    // Validate id against candidates; reject low-confidence matches
-    const validIds = new Set(safeCandidates.map((c) => c.id));
-    const matchedId = validIds.has(parsed.id) ? parsed.id : null;
-    const confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
-    const id = confidence >= 0.5 ? matchedId : null;
-
-    res.json({
-      id,
-      confidence,
-      reason: (parsed.reason || '').toString().slice(0, 200),
-    });
-  } catch (e) {
-    console.error('match-reply-target error:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ──────────────────────────────────────────────
 //  Voice Posts — POST /api/voice-posts
 // ──────────────────────────────────────────────
 app.post('/api/voice-posts', async (req, res) => {
@@ -1045,7 +970,7 @@ app.post('/api/channels', requireAuth, async (req, res) => {
     const id = randomUUID().replace(/-/g, '').substring(0, 12);
     const channel = await db.createChannel({ id, name, createdBy });
     await db.addChannelMember(createdBy, channel.id); // auto-member
-    res.json({ channel, url: `/private/${id}` });
+    res.json({ channel, url: `/?private_channel_id=${id}` });
   } catch (err) {
     console.error('create-channel error:', err);
     res.status(500).json({ error: 'Failed to create channel', details: err.message });
@@ -1202,15 +1127,6 @@ app.post('/api/openai-session', requireAuth, async (req, res) => {
   }
 });
 
-
-app.get('/private', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'private.html'));
-});
-
-// Serve channel page for /private/:id
-app.get('/private/:id', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'channel.html'));
-});
 
 // ──────────────────────────────────────────────
 //  Claude Chat — POST /api/claude-chat
@@ -1403,7 +1319,7 @@ app.post('/api/billing/create-subscription', requireAuth, async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price: MONTHLY_PRICE_ID, quantity: 1 }],
       success_url: `${baseUrl}/?subscribed=1`,
-      cancel_url:  `${baseUrl}/upgrade`,
+      cancel_url:  `${baseUrl}/`,
       metadata: { userId: req.user.phone },
     });
     res.json({ url: session.url });
@@ -1442,7 +1358,7 @@ app.post('/api/billing/create-checkout', requireAuth, async (req, res) => {
       payment_method_types: ['card'],
       line_items: [{ price: DELUXE_PRICE_IDS[type], quantity: 1 }],
       success_url: `${baseUrl}/?upgraded=1&type=${type}`,
-      cancel_url:  `${baseUrl}/upgrade`,
+      cancel_url:  `${baseUrl}/`,
       metadata: { userId: req.user.phone, deluxeType: type },
     });
     res.json({ url: session.url });
@@ -1824,11 +1740,6 @@ app.get('/api/admin/usage', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-
-// ── Upgrade landing page ──
-app.get('/upgrade', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'upgrade.html'));
 });
 
 // ── /config.js — expose public OAuth IDs to the browser ──
