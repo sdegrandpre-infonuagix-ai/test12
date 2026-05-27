@@ -46,6 +46,18 @@ function Build-LambdaZip {
     Remove-Item $stage -Recurse -Force
 }
 
+# ── 0. Build Tailwind CSS (fail fast — production must not ship stale or missing CSS) ──
+# Runs before the Step-1 bundling so public/dist/tailwind.css is included in bundle.zip's
+# public/ tree. Story 0.8: requires npm dev deps to be installed (tailwindcss, postcss,
+# autoprefixer); run `npm install` once locally if this step errors with "tailwindcss not found".
+Write-Host "Step 0 - Building Tailwind CSS..." -ForegroundColor Yellow
+npm run build:css
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: 'npm run build:css' failed (exit $LASTEXITCODE). Aborting deploy — production must not ship stale or missing CSS. Run 'npm install' first if tailwindcss is missing." -ForegroundColor Red
+    exit 1
+}
+Write-Host "  Tailwind CSS built: public/dist/tailwind.css"
+
 # ── 1. Package Web UI ZIP ──
 Write-Host "Step 1/8 - Packaging Web UI ZIP..." -ForegroundColor Yellow
 npm install --omit=dev 2>&1 | Out-Null

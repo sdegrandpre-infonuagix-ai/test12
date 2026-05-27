@@ -12,12 +12,7 @@
 - [x] Story 0.5: Migrate compose form, orb, and agent-card to Tailwind utilities
 - [x] Story 0.6: Migrate auth modal, PWA banner, body background to Tailwind utilities
 - [x] Story 0.7: Update sw.js to include dist/tailwind.css and bump CACHE_VERSION
-  > As a **returning test12 user after the Tailwind migration ships**
-  > I want **the service worker to fetch the new CSS and cache it cleanly**
-  > So that **my installed PWA picks up the new styles on next launch with at most a one-time slow load**.
-  > AC: Given the Tailwind migration is otherwise complete and `public/dist/tailwind.css` is produced by the build, When `public/sw.js` is updated, Then `CACHE_VERSION` is bumped from `'test12-v5'` to `'test12-v6'`, And `STATIC_ASSETS` includes `'/dist/tailwind.css'`, And the cache-first strategy for static CSS files matches `/\.css$/` (already covered by the existing static-asset matcher), And the activate handler purges the old `test12-v5` cache (existing logic; verified to still work), And a returning user with the old service-worker cache experiences exactly ONE slow load on first visit after deploy, then normal speed thereafter
-  > Spec: specs/planning-artifacts/epics.md#story-0-7
-- [ ] Story 0.8: Update deploy scripts to invoke build:css
+- [x] Story 0.8: Update deploy scripts to invoke build:css
   > As a **developer deploying test12**
   > I want **`deploy.ps1` and `deploy-dev.ps1` to invoke `npm run build:css` before bundling**
   > So that **production deploys always include the latest Tailwind output**.
