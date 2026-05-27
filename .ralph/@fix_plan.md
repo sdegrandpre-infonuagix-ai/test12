@@ -13,12 +13,7 @@
 - [x] Story 0.6: Migrate auth modal, PWA banner, body background to Tailwind utilities
 - [x] Story 0.7: Update sw.js to include dist/tailwind.css and bump CACHE_VERSION
 - [x] Story 0.8: Update deploy scripts to invoke build:css
-  > As a **developer deploying test12**
-  > I want **`deploy.ps1` and `deploy-dev.ps1` to invoke `npm run build:css` before bundling**
-  > So that **production deploys always include the latest Tailwind output**.
-  > AC: Given `deploy.ps1` and `deploy-dev.ps1` in their current state, When these scripts are updated, Then each script invokes `npm run build:css` as one of the first steps (before any bundling/upload), And the script fails fast (non-zero exit) if `build:css` fails — preventing deploys with stale or missing CSS, And `public/dist/tailwind.css` is included in whatever bundling/upload step ships static assets to S3/CloudFront
-  > Spec: specs/planning-artifacts/epics.md#story-0-8
-- [ ] Story 0.9: Final regression pass on existing flows
+- [x] Story 0.9: Final regression pass on existing flows
   > As a **test12 user**
   > I want **every existing flow to work identically after migration**
   > So that **the Tailwind migration is invisible to me as a user**.
