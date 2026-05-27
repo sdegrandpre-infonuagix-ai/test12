@@ -655,6 +655,81 @@
       background: linear-gradient(135deg, rgba(250,204,21,0.18), rgba(251,191,36,0.08));
       color: #fbbf24; border: 1px solid rgba(250,204,21,0.4);
     }
+
+    /* ══════════════════════════════════════════
+       RESPONSIVE — smartphones (≤ 640px)
+       ══════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* Scale with viewport width — 5vw ≈ 19px on a 390px phone */
+      html { font-size: clamp(17px, 5vw, 20px); }
+      body { font-size: 1rem; }
+
+      /* Tighter gutters so panels fill the screen edge-to-edge */
+      header,
+      .agent-card,
+      .logs-card,
+      .channels-section { margin-left: 0.4rem; margin-right: 0.4rem; }
+
+      header { padding: 3.8rem 1rem 0.75rem; }
+      header h1 { font-size: 1.4rem; }
+      header p  { font-size: 0.95rem; line-height: 1.55; }
+
+      /* Agent card */
+      .agent-card { padding: 1.25rem 1rem; gap: 1rem; }
+
+      /* Orb */
+      .orb { width: 90px; height: 90px; }
+
+      /* Buttons — minimum 48px tall for touch */
+      .btn { font-size: 1rem; padding: 15px 22px; border-radius: 14px; }
+      .btn-row { gap: 0.5rem; }
+
+      /* Status / transcript */
+      #status-text { font-size: 0.95rem; }
+      #transcript  { font-size: 0.95rem; }
+
+      /* Agent/voice log */
+      .log-line    { font-size: 0.9rem; line-height: 1.6; }
+      .logs-header { font-size: 0.85rem; }
+
+      /* Channel panels */
+      .channel-panel { padding: 0.9rem 1rem; }
+      .channel-panel .ch-name { font-size: 1.05rem; }
+      .channel-panel .ch-meta { font-size: 0.82rem; }
+      .channel-panel .ch-id   { font-size: 0.76rem; }
+      .ch-msg   { font-size: 0.92rem; line-height: 1.55; }
+      .ch-empty { font-size: 0.85rem; }
+      .compose-input { font-size: 1rem; padding: 0.6rem 0.9rem; }
+      .compose-btn   { font-size: 1rem; padding: 0.6rem 1rem; }
+
+      /* Usage bars — was 0.6rem, now at least 13px */
+      .aub-label { font-size: 0.78rem; }
+      .aub-mins  { font-size: 0.78rem; width: 6.2rem; }
+      .aub-row   { width: min(100%, 94vw); }
+
+      /* Header sign-in/out */
+      .header-login-link { top: 0.8rem; right: 0.8rem; font-size: 0.9rem; padding: 8px 14px; }
+
+      /* Text prompt */
+      #text-prompt-input { font-size: 1rem; }
+
+      /* Profile modal */
+      .profile-modal { padding: 1.5rem 1.1rem 1.25rem; border-radius: 14px; }
+      .pm-name          { font-size: 1.15rem; }
+      .pm-section-title { font-size: 0.82rem; }
+      .pm-usage-row     { font-size: 0.88rem; }
+      .pm-buy-btn       { font-size: 1rem; padding: 0.9rem; }
+
+      /* Login box */
+      .login-box  { padding: 2rem 1.25rem 1.5rem; border-radius: 14px; }
+      .login-title { font-size: 1.3rem; }
+      .social-btn  { font-size: 1rem; padding: 14px 16px; }
+      .login-btn   { font-size: 1rem; padding: 14px; }
+      .login-input { font-size: 1rem; padding: 13px 14px; }
+
+      /* Footer */
+      .powered-footer { font-size: 0.78rem; padding: 1.25rem 1rem 1.5rem; }
+    }
   </style>
 </head>
 <body>
@@ -1811,7 +1886,7 @@ let isSpeaking = false;
 let pendingAudioChunks = [];
 let isConnected = false;
 let transcriptBuffer = '';
-const WS_REALTIME_URL = 'wss://oi5xvdqev1.execute-api.us-east-1.amazonaws.com/prod';
+const WS_REALTIME_URL = 'wss://ai37ke0end.execute-api.us-east-1.amazonaws.com/prod';
 const renderedPostIds = new Set(); // dedup public posts between HTTP load and WS push
 
 // ── Logging ──
@@ -2076,7 +2151,7 @@ function refreshVAMode() {
       + `invite a friend through SMS to create a profile on Test 1 2 and join a private channel, `
       + `read posts, create posts, `
       + `change agent to Sonnet, change agent to xAI Voice Agent or change agent to OpenAI Realtime agent. `
-      + `All agents support multiple languages!`;
+      + `All agents support multiple languages! What would you like to do?`;
     setTimeout(() => ptSpeak(welcome), 800);
   }
 }
@@ -2455,13 +2530,17 @@ function updateAgentUI() {
   async function rtStartMicrophone(wsRef) {
     if (!rtAudioCtx) rtAudioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:24000});
     await rtAudioCtx.resume();
-    // sampleRate constraint omitted: Safari throws OverconstrainedError if unsupported
     rtMicStream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
     const src = rtAudioCtx.createMediaStreamSource(rtMicStream);
-    rtMicProcessor = rtAudioCtx.createScriptProcessor(4096,1,1);
-    rtMicProcessor.onaudioprocess = (e) => {
+    // AudioWorkletNode replaces the deprecated ScriptProcessorNode
+    const workletSrc = `class PcmCapture extends AudioWorkletProcessor{process(i){if(i[0]&&i[0][0])this.port.postMessage(i[0][0]);return true;}}registerProcessor('pcm-capture',PcmCapture);`;
+    const blobUrl = URL.createObjectURL(new Blob([workletSrc],{type:'application/javascript'}));
+    await rtAudioCtx.audioWorklet.addModule(blobUrl);
+    URL.revokeObjectURL(blobUrl);
+    rtMicProcessor = new AudioWorkletNode(rtAudioCtx, 'pcm-capture');
+    rtMicProcessor.port.onmessage = (e) => {
       if (!wsRef()||wsRef().readyState!==WebSocket.OPEN) return;
-      const b64 = arrayBufferToBase64(float32ToPcm16(e.inputBuffer.getChannelData(0)).buffer);
+      const b64 = arrayBufferToBase64(float32ToPcm16(e.data).buffer);
       wsRef().send(JSON.stringify({type:'input_audio_buffer.append',audio:b64}));
     };
     src.connect(rtMicProcessor); rtMicProcessor.connect(rtAudioCtx.destination);
@@ -2478,16 +2557,35 @@ function updateAgentUI() {
     rtIsConnected=false; rtIsSpeaking=false; rtTranscriptBuffer='';
     rtStopMicrophone(); setOrb(''); setStatus('Disconnected');
     connectBtn.disabled=false; disconnectBtn.disabled=true; rtWs=null;
+    sessionStorage.removeItem('_oaiGreeted');
     // Free the session slot immediately (don't wait for DynamoDB TTL)
     fetch('/api/session/end', { method: 'POST', headers: authHeaders() }).catch(() => {});
     _endAddonSession();
+  }
+
+  // Shared UI refresh after any MCP tool execution (strips optional "Label." prefix)
+  async function _rtRefreshUI(rawName, out) {
+    const n = (rawName||'').replace(/^[A-Za-z0-9_-]+\./, '');
+    if (n==='list_posts'||n==='create_post'){
+      setActiveChannel('public');
+      // Delay the final refresh so the DB write is visible on the read side
+      await new Promise(r => setTimeout(r, 600));
+      await loadPublicPosts();
+    }
+    if (['read_channel_messages','send_channel_message','join_private_channel','create_private_channel'].includes(n)){
+      const cid=out?.channel?.id||out?.channel_id||out?.id;
+      if(cid){
+        if(n==='create_private_channel') await fetch(`/api/channels/${cid}/join`,{method:'POST',headers:authHeaders()}).catch(()=>{});
+        addMyChannelId(cid); await loadPrivateChannels(); setActiveChannel(cid);
+      }
+    }
   }
 
   async function handleRealtimeEvent(ev) {
     const msg = JSON.parse(ev.data);
     switch (msg.type) {
       case 'session.created': log('ws','Session created — model: <b>'+(msg.session?.model||'?')+'</b>'); break;
-      case 'mcp_list_tools.completed': log('ws','MCP tools loaded ✓'); rtGreet(); break;
+      case 'mcp_list_tools.completed': log('ws','MCP tools loaded ✓'); sessionStorage.setItem('_oaiGreeted','1'); rtGreet(); break;
       case 'input_audio_buffer.speech_started': setOrb('listening'); setStatus('Listening…'); rtNextPlayTime=0; rtIsSpeaking=false; break;
       case 'input_audio_buffer.speech_stopped': setStatus('Thinking…'); setOrb('connecting'); break;
       case 'conversation.item.input_audio_transcription.completed': if(msg.transcript) log('text','You: <b>'+msg.transcript+'</b>'); break;
@@ -2504,30 +2602,52 @@ function updateAgentUI() {
         const rem=Math.max(0,rtNextPlayTime-(rtAudioCtx?.currentTime||0));
         setTimeout(()=>{rtIsSpeaking=false;setOrb('listening');setStatus('Listening…');},rem*1000+200); break;
       }
-      case 'response.output_item.done':
-        if (msg.item?.type==='function_call') {
-          const {name,call_id,arguments:rawArgs}=msg.item;
+      case 'response.output_item.done': {
+        const item = msg.item;
+        if (item?.type==='function_call') {
+          const {name,call_id,arguments:rawArgs}=item;
           let args={}; try{args=JSON.parse(rawArgs||'{}');}catch(_){}
           log('tool',`Called: <b>${name}</b>`);
-          if (['pick_contact','send_invite','set_alias','remove_alias'].includes(name)) handleClientTool(name,args,call_id,rtWs);
-        } break;
-      case 'response.mcp_call.completed': {
-        const tn=msg.mcp_call?.name||'';
-        const out=(()=>{try{return JSON.parse(msg.mcp_call?.output||'{}');}catch(_){return{};}})();
-        if (tn==='list_posts'||tn==='create_post'){setActiveChannel('public');loadPublicPosts();}
-        if (['read_channel_messages','send_channel_message','join_private_channel','create_private_channel'].includes(tn)){
-          const cid=out.channel?.id||out.channel_id||out.id;
-          if(cid){
-            if(tn==='create_private_channel'){
-              await fetch(`/api/channels/${cid}/join`,{method:'POST',headers:authHeaders()}).catch(()=>{});
+          // xAI MCP tools arrive as function_call with "ServerLabel.toolName" naming
+          const xaiMcp = name.match(/^[A-Za-z0-9_-]+\.(.+)$/);
+          if (xaiMcp) {
+            const toolName = xaiMcp[1];
+            try {
+              const result = await mcpCall(toolName, args);
+              await _rtRefreshUI(toolName, result);
+              rtWs.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id,output:JSON.stringify(result)}}));
+              rtWs.send(JSON.stringify({type:'response.create'}));
+            } catch(e) {
+              log('error',`MCP exec failed: ${e.message}`);
+              rtWs.send(JSON.stringify({type:'conversation.item.create',item:{type:'function_call_output',call_id,output:JSON.stringify({error:e.message})}}));
+              rtWs.send(JSON.stringify({type:'response.create'}));
             }
-            addMyChannelId(cid);
-            await loadPrivateChannels();
-            setActiveChannel(cid);
+          } else if (['pick_contact','send_invite','set_alias','remove_alias'].includes(name)) {
+            handleClientTool(name,args,call_id,rtWs);
           }
+        } else if (item?.type==='mcp_call') {
+          // OpenAI executes MCP tools server-side; just refresh UI from result
+          const out = (()=>{try{return JSON.parse(item.output||'{}');}catch(_){return{};}})();
+          await _rtRefreshUI(item.name, out);
         } break;
       }
+      case 'response.mcp_call.in_progress': console.debug('[mcp_ip]',JSON.stringify(msg)); log('tool',`MCP calling: <b>${msg.name||msg.mcp_call?.name||msg.call_id||'?'}</b>`); break;
+      case 'response.mcp_call.completed': {
+        console.debug('[mcp_done]',JSON.stringify(msg));
+        const tn=msg.name||msg.mcp_call?.name||msg.call?.name||'';
+        log('tool',`MCP done: <b>${tn||'(check console)'}</b>`);
+        break;
+      }
+      case 'response.mcp_call.failed': log('error',`MCP failed: <b>${msg.mcp_call?.name||'?'}</b> — ${msg.mcp_call?.error||''}`); break;
+      case 'response.output_item.added':
+        if (msg.item?.type==='mcp_call') log('tool',`MCP queued: <b>${msg.item?.name||'?'}</b>`);
+        if (msg.item?.type==='function_call') log('tool',`Fn queued: <b>${msg.item?.name||'?'}</b>`);
+        break;
       case 'error': log('error',msg.error?.message||JSON.stringify(msg.error)); break;
+      case 'session.updated': break; // suppress noise
+      default:
+        if (msg.type?.startsWith('response.') && !['response.output_audio_transcript.delta','response.output_audio.delta','response.audio.delta'].includes(msg.type))
+          console.debug('[rt]', msg.type, JSON.stringify(msg).slice(0,120));
     }
   }
 
@@ -2537,7 +2657,7 @@ function updateAgentUI() {
       ? `The user "${autoUsername}" wants to join private channel "${autoChannelId}". Call join_private_channel then greet them and read recent messages aloud.`
       : `You are now connected with full MCP access. Briefly greet the user and summarise what you can help with in one sentence.`;
     rtWs.send(JSON.stringify({type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:promptText}]}}));
-    rtWs.send(JSON.stringify({type:'response.create',response:{modalities:['text','audio']}}));
+    rtWs.send(JSON.stringify({type:'response.create'}));
     setOrb('speaking'); setStatus(isAutoJoin?'Joining channel…':'Agent greeting…');
   }
 
@@ -2570,7 +2690,7 @@ function updateAgentUI() {
         log('ws','Connecting to <b>xAI Grok-3 Realtime</b>…');
       } else {
         wsUrl = `wss://api.openai.com/v1/realtime?model=gpt-realtime-2`;
-        wsProtocols = ['realtime', `openai-insecure-api-key.${token}`, 'openai-beta.realtime-v1'];
+        wsProtocols = ['realtime', `openai-insecure-api-key.${token}`];
         log('ws','Connecting to <b>OpenAI gpt-realtime-2</b>…');
       }
 
@@ -2598,23 +2718,34 @@ function updateAgentUI() {
             tool_choice:'auto'
           }}));
         } else {
-          // OpenAI realtime session config
+          // OpenAI realtime session config (GA API)
           rtWs.send(JSON.stringify({type:'session.update',session:{
-            voice:'alloy',
-            instructions: 'You are a helpful voice assistant for Test12, a voice-first social platform. Be concise. Current user: '+(currentUser?.displayName||'unknown')+'. Speak in the user\'s language.',
-            turn_detection:{type:'server_vad'},
-            modalities:['text','audio'],
-            input_audio_transcription:{model:'whisper-1'},
-            input_audio_format:'pcm16', output_audio_format:'pcm16',
+            type:'realtime',
+            model:'gpt-realtime-2',
+            instructions: 'You are a helpful voice assistant for Test12, a voice-first social platform. Be concise and action-oriented. Use MCP tools for posts and channels. Current user: '+(currentUser?.displayName||'unknown')+'. Speak in the user\'s language.',
+            output_modalities:['audio'],
+            audio:{
+              input:{
+                format:{type:'audio/pcm',rate:24000},
+                transcription:{model:'gpt-4o-transcribe'},
+                turn_detection:{type:'server_vad',threshold:0.5,prefix_padding_ms:300,silence_duration_ms:500}
+              },
+              output:{
+                format:{type:'audio/pcm',rate:24000},
+                voice:'alloy'
+              }
+            },
             tools:[
-              {type:'function',name:'list_posts',description:'List recent public posts.',parameters:{type:'object',properties:{limit:{type:'number'}},required:[]}},
-              {type:'function',name:'create_post',description:'Create a public post.',parameters:{type:'object',properties:{text:{type:'string'},author:{type:'string'}},required:['text','author']}},
-              {type:'function',name:'send_invite',description:'Send a channel invite.',parameters:{type:'object',properties:{phone:{type:'string'},email:{type:'string'},channel_id:{type:'string'},contact_name:{type:'string'},sender_name:{type:'string'}},required:['channel_id']}}
+              {type:'mcp',server_label:'Test12',server_url:MCP_URL,require_approval:'never'},
+              {type:'function',name:'pick_contact',description:'Open phone contact picker.',parameters:{type:'object',properties:{},required:[]}},
+              {type:'function',name:'send_invite',description:'Send a private channel invite.',parameters:{type:'object',properties:{phone:{type:'string'},email:{type:'string'},channel_id:{type:'string'},contact_name:{type:'string'},sender_name:{type:'string'}},required:['channel_id']}},
+              {type:'function',name:'set_alias',description:'Remember a nickname for a username.',parameters:{type:'object',properties:{username:{type:'string'},alias:{type:'string'}},required:['username','alias']}},
+              {type:'function',name:'remove_alias',description:'Remove a personal alias.',parameters:{type:'object',properties:{username:{type:'string'}},required:['username']}}
             ],
             tool_choice:'auto'
           }}));
-          // Greet immediately (OpenAI doesn't fire mcp_list_tools)
-          setTimeout(() => rtGreet(), 500);
+          // Greet after MCP loads (mcp_list_tools.completed) or fall back after 2s
+          setTimeout(() => { if (!sessionStorage.getItem('_oaiGreeted')) rtGreet(); }, 2000);
         }
         log('agent','Session configured → '+MCP_URL);
         rtStartMicrophone(() => rtWs);

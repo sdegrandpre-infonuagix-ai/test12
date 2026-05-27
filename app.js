@@ -1080,10 +1080,7 @@ app.get('/api/addon/remaining', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/session', requireDeluxe, async (req, res) => {
-  if (req.deluxeType && req.deluxeType !== 'xai') {
-    return res.status(403).json({ error: 'This endpoint is for xAI Deluxe only.' });
-  }
+app.post('/api/session', requireAuth, async (req, res) => {
   const limit = await checkAddonLimit(req.user.phone, 'xai').catch(() => null);
   if (limit?.exceeded) {
     return res.status(402).json({ error: 'xAI Voice block exhausted (3-hour limit reached).', usedMins: limit.usedMins, limitMins: limit.limitMins });
@@ -1106,23 +1103,20 @@ app.post('/api/session', requireDeluxe, async (req, res) => {
   }
 });
 // POST /api/openai-session — OpenAI realtime ephemeral token (Deluxe OpenAI only)
-app.post('/api/openai-session', requireDeluxe, async (req, res) => {
-  if (req.deluxeType && req.deluxeType !== 'openai') {
-    return res.status(403).json({ error: 'This endpoint is for OpenAI Deluxe only.' });
-  }
+app.post('/api/openai-session', requireAuth, async (req, res) => {
   const limit = await checkAddonLimit(req.user.phone, 'openai').catch(() => null);
   if (limit?.exceeded) {
     return res.status(402).json({ error: 'OpenAI Realtime block exhausted (3-hour limit reached).', usedMins: limit.usedMins, limitMins: limit.limitMins });
   }
   if (!OPENAI_API_KEY) return res.status(503).json({ error: 'OpenAI API not configured' });
   try {
-    const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
+    const r = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ model: 'gpt-realtime-2', voice: 'alloy' }),
+      body: JSON.stringify({ session: { type: 'realtime', model: 'gpt-realtime-2' } }),
     });
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json(data);

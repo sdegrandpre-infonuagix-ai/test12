@@ -7,7 +7,7 @@
 // ═══════════════════════════════════════════
 'use strict';
 
-const CACHE_VERSION = 'test12-v1';
+const CACHE_VERSION = 'test12-v4';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -41,6 +41,9 @@ self.addEventListener('activate', (event) => {
 // ── Fetch: route requests ──
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Ignore non-http(s) schemes (chrome-extension://, etc.)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
   // Never cache: API calls, WebSocket upgrades, POST requests
   if (
