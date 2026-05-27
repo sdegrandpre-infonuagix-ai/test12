@@ -11,12 +11,7 @@
 - [x] Story 0.4: Migrate channels section to Tailwind utilities
 - [x] Story 0.5: Migrate compose form, orb, and agent-card to Tailwind utilities
 - [x] Story 0.6: Migrate auth modal, PWA banner, body background to Tailwind utilities
-  > As a **test12 user**
-  > I want **the auth modal (Login/OTP), PWA install banner, and ambient body background to look identical**
-  > So that **the auth and PWA-install flows are visually unchanged**.
-  > AC: Given the auth-modal CSS, `#pwa-banner` CSS, `body::before` ambient-gradient pseudo-element, and `body` base styles, When these styles are migrated to Tailwind utilities (with `body::before` either preserved as one of the few remaining hand-written rules OR re-expressed as a positioned `<div>`), Then the auth modal renders identically; login/OTP/profile flows work as before, And the PWA install banner renders identically; the install prompt fires correctly, And the body background ambient gradient is visually identical (subtle radial gradients in upper-left and lower-right), And the iOS `-webkit-fill-available` viewport fix is preserved
-  > Spec: specs/planning-artifacts/epics.md#story-0-6
-- [ ] Story 0.7: Update sw.js to include dist/tailwind.css and bump CACHE_VERSION
+- [x] Story 0.7: Update sw.js to include dist/tailwind.css and bump CACHE_VERSION
   > As a **returning test12 user after the Tailwind migration ships**
   > I want **the service worker to fetch the new CSS and cache it cleanly**
   > So that **my installed PWA picks up the new styles on next launch with at most a one-time slow load**.

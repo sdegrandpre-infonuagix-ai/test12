@@ -7,12 +7,13 @@
 // ═══════════════════════════════════════════
 'use strict';
 
-const CACHE_VERSION = 'test12-v5';
+const CACHE_VERSION = 'test12-v6';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/dist/tailwind.css',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
 ];
 
