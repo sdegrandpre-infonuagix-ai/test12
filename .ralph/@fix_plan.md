@@ -7,12 +7,7 @@
 
 - [x] Story 0.1: Add Tailwind build pipeline
 - [x] Story 0.2: Configure Tailwind theme with existing brand tokens
-  > As a **developer authoring switcher and future components**
-  > I want **`tailwind.config.js` to expose test12's existing brand tokens as named Tailwind classes**
-  > So that **I can write `bg-brand-teal` instead of `bg-[#1595b2]` and the tokens are documented in one place**.
-  > AC: Given `tailwind.config.js` exists from Story 0.1, When the file is configured per UX-DR1, Then `theme.extend.colors` contains `brand.teal #1595b2`, `brand.amber #f59e0b`, `brand.red #ef4444`, `surface.dark #050810`, `surface.dark-elevated #1e293b`, `text.primary #e2e8f0`, `text.muted #64748b`, and the four `overlay.teal-*` translucent variants, And `theme.extend.fontFamily.sans` is `['Inter', 'sans-serif']`, And `theme.extend.boxShadow` includes `shadow.hover` (matches `.channel-panel:hover`) and `shadow.sheet`, And `theme.extend.spacing` includes the existing irregular scale (`0.4rem`, `6px`, `14px`, etc.) as named tokens, And `content` glob covers `public/index.html` so utility classes used there are detected by the purge step, And a smoke test (rendering one element styled with `bg-brand-teal text-text-primary`) renders the correct color
-  > Spec: specs/planning-artifacts/epics.md#story-0-2
-- [ ] Story 0.3: Migrate header chrome to Tailwind utilities
+- [x] Story 0.3: Migrate header chrome to Tailwind utilities
   > As a **test12 user**
   > I want **the header (login link, profile, sign-out buttons, addon-usage-bars) to look and behave identically after migration**
   > So that **I see no visual change but the codebase has been moved off inline CSS for the header region**.

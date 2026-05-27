@@ -17,6 +17,8 @@
   <link rel="apple-touch-icon" sizes="167x167" href="/icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind output (precedes inline <style> so un-migrated inline rules still win during the migration) -->
+  <link rel="stylesheet" href="/dist/tailwind.css">
   <!-- WebMCP compliance — allows AI browsers to discover and invoke Test12 tools -->
   <meta name="mcp" content="Test12 — voice-first social platform. Read posts, create posts, manage private channels.">
   <style>
@@ -53,72 +55,7 @@
       padding-top: 5rem; /* leave room above title for the 3 usage gauges */
       position: relative;
     }
-    .header-login-link {
-      position: absolute;
-      top: 1.2rem; right: 1.5rem;
-      font-size: 0.85rem; font-weight: 600;
-      color: #1595b2; text-decoration: none;
-      background: rgba(21,149,178,0.1);
-      border: 1px solid rgba(21,149,178,0.3);
-      border-radius: 8px;
-      padding: 6px 14px;
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s;
-    }
-    .header-login-link:hover { background: rgba(21,149,178,0.2); border-color: rgba(21,149,178,0.6); }
-
-    /* ── Add-on usage progress bars (top-left of header) ── */
-    #addon-usage-bars {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      width: 100%;
-      padding: 0.75rem 1rem 0;
-    }
-    .aub-row {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      width: min(360px, 90vw);
-    }
-    .aub-bar-line {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .aub-label {
-      font-size: 0.6rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #64748b;
-      white-space: nowrap;
-      text-align: left;
-    }
-    .aub-track {
-      flex: 1;
-      height: 5px;
-      background: rgba(255,255,255,0.07);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .aub-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.6s ease;
-    }
-    .aub-fill.ok   { background: #1595b2; }
-    .aub-fill.warn { background: #f59e0b; }
-    .aub-fill.full { background: #ef4444; }
-    .aub-mins {
-      font-size: 0.6rem;
-      color: #94a3b8;
-      width: 5.5rem;
-      text-align: right;
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
+    /* Header chrome (.header-login-link, #addon-usage-bars, .aub-*) migrated to src/styles/tailwind.css (Story 0.3) */
 
     header h1 {
       font-size: 1.5rem;
@@ -702,13 +639,7 @@
       .compose-input { font-size: 1rem; padding: 0.6rem 0.9rem; }
       .compose-btn   { font-size: 1rem; padding: 0.6rem 1rem; }
 
-      /* Usage bars — was 0.6rem, now at least 13px */
-      .aub-label { font-size: 0.78rem; }
-      .aub-mins  { font-size: 0.78rem; width: 6.2rem; }
-      .aub-row   { width: min(100%, 94vw); }
-
-      /* Header sign-in/out */
-      .header-login-link { top: 0.8rem; right: 0.8rem; font-size: 0.9rem; padding: 8px 14px; }
+      /* Usage bars + header sign-in/out mobile overrides migrated to src/styles/tailwind.css (Story 0.3) */
 
       /* Text prompt */
       #text-prompt-input { font-size: 1rem; }
