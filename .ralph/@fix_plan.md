@@ -9,12 +9,7 @@
 - [x] Story 0.2: Configure Tailwind theme with existing brand tokens
 - [x] Story 0.3: Migrate header chrome to Tailwind utilities
 - [x] Story 0.4: Migrate channels section to Tailwind utilities
-  > As a **test12 user**
-  > I want **the public-channel and private-channels sections to look identical after migration**
-  > So that **posting, reading, and channel navigation are visually unchanged**.
-  > AC: Given the `.channels-section`, `.channel-panel`, `.channel-panel.active`, `.ch-name`, `.ch-meta`, `.ch-id`, `.ch-messages`, `.ch-empty` rules, When these styles are migrated to Tailwind utilities, Then public-channel and private-channels-created/joined sections render pixel-identical to pre-migration, And active-channel highlight, hover translateY/box-shadow effects, mobile responsive padding all behave identically, And the existing `setActiveChannel()`, `loadPublicPosts()`, `loadPrivateChannels()` functions continue to update DOM correctly
-  > Spec: specs/planning-artifacts/epics.md#story-0-4
-- [ ] Story 0.5: Migrate compose form, orb, and agent-card to Tailwind utilities
+- [x] Story 0.5: Migrate compose form, orb, and agent-card to Tailwind utilities
   > As a **test12 user**
   > I want **the agent card, orb animation, connect/disconnect buttons, and compose forms to look and behave identically**
   > So that **the voice-flow UI (the primary user surface) is visually unchanged**.
