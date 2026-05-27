@@ -6,12 +6,7 @@
 > Goal: Migrate test12's inline `<style>`-block CSS to Tailwind utility classes, with a proper PostCSS+CLI build step, preserving all existing brand tokens and user-visible appearance. This is the hard prerequisite for all switcher epics.
 
 - [x] Story 0.1: Add Tailwind build pipeline
-  > As a **developer maintaining test12**
-  > I want **a PostCSS+Tailwind CLI build pipeline configured**
-  > So that **I can author styles in Tailwind utilities and produce a purged production CSS bundle**.
-  > AC: Given the repo at its current state with no build step, When `npm install` runs after this story's `package.json` changes are merged, Then `tailwindcss`, `postcss`, and `autoprefixer` are installed as devDependencies, And `npm run build:css` produces `public/dist/tailwind.css` from `public/index.html`'s utility class usage, And `npm run watch:css` runs the same build in watch mode for development iteration, And `public/dist/` is added to `.gitignore` (build output, not source), And the build completes in under 5 seconds for the existing codebase size
-  > Spec: specs/planning-artifacts/epics.md#story-0-1
-- [ ] Story 0.2: Configure Tailwind theme with existing brand tokens
+- [x] Story 0.2: Configure Tailwind theme with existing brand tokens
   > As a **developer authoring switcher and future components**
   > I want **`tailwind.config.js` to expose test12's existing brand tokens as named Tailwind classes**
   > So that **I can write `bg-brand-teal` instead of `bg-[#1595b2]` and the tokens are documented in one place**.
