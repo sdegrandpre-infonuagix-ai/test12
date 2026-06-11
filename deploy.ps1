@@ -377,11 +377,15 @@ $MCP_URL = Ensure-FunctionUrl -FnName $MCP_NAME
 # Idempotent: ensures the test12-alerts SNS topic and upserts the alarms.
 # Non-fatal — a missing cloudwatch:PutMetricAlarm / sns:CreateTopic grant on the
 # deploying principal should warn, not abort an otherwise-good code deploy.
-Write-Host "`nStep 9 - Provisioning CloudWatch alarms..." -ForegroundColor Yellow
+Write-Host "`nStep 9 - Provisioning CloudWatch observability (alarms + dashboard)..." -ForegroundColor Yellow
 $env:AWS_REGION = $REGION
 node scripts/cloudwatch/provision-alarms.js
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  WARNING: alarm provisioning failed (exit $LASTEXITCODE). Check IAM (cloudwatch:PutMetricAlarm, sns:CreateTopic) — code deploy is unaffected." -ForegroundColor Yellow
+}
+node scripts/cloudwatch/provision-dashboard.js
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  WARNING: dashboard provisioning failed (exit $LASTEXITCODE). Check IAM (cloudwatch:PutDashboard) — code deploy is unaffected." -ForegroundColor Yellow
 }
 
 Write-Host "`nDeployment complete!" -ForegroundColor Green
