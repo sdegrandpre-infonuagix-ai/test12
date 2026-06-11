@@ -14,7 +14,7 @@
 - [x] Story 0.7: Update sw.js to include dist/tailwind.css and bump CACHE_VERSION
 - [x] Story 0.8: Update deploy scripts to invoke build:css
 - [x] Story 0.9: Final regression pass on existing flows
-- [ ] Story 0.10: Verify existing UI accessibility baseline (UX-DR17)
+- [x] Story 0.10: Verify existing UI accessibility baseline (UX-DR17)
   > As a **test12 user with assistive needs**
   > I want **the existing header chrome and core flows to meet WCAG 2.1 AA before the switcher commits to AA**
   > So that **the new switcher doesn't inherit unfixable accessibility debt from its surrounding context**.

@@ -150,7 +150,7 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #64748b;
+      color: #94a3b8; /* Story 0.10 (UX-DR17): was #64748b — WCAG AA contrast on dark */
     }
     /* #logs migrated to src/styles/tailwind.css (Story 0.5) */
     .log-entry {
@@ -189,7 +189,7 @@
     .powered-footer {
       width: 100%; text-align: center;
       padding: 1.5rem 1rem 2rem; margin-top: auto;
-      font-size: 0.7rem; color: #475569; letter-spacing: 0.04em;
+      font-size: 0.7rem; color: #94a3b8; letter-spacing: 0.04em; /* Story 0.10 (UX-DR17): was #475569 — WCAG AA contrast */
     }
     .powered-footer a {
       color: #1595b2; text-decoration: none; font-weight: 600;
@@ -200,7 +200,7 @@
     .profile-badge {
       display: flex; align-items: center; gap: 0.5rem;
       justify-content: center; margin-top: 0.25rem;
-      font-size: 0.75rem; color: #64748b;
+      font-size: 0.75rem; color: #94a3b8; /* Story 0.10 (UX-DR17): was #64748b — WCAG AA contrast */
     }
     .profile-badge strong { color: #1595b2; }
     .profile-badge button {
@@ -568,7 +568,7 @@
   <!-- ═══ ALIASES PANEL ═══ -->
   <div class="channels-section" id="aliases-section" style="display:none">
     <h2>🏷️ My Aliases</h2>
-    <p style="font-size:0.75rem;color:#64748b;margin-bottom:0.5rem">Your private nicknames for friends' public usernames — only you see these.</p>
+    <p style="font-size:0.75rem;color:#94a3b8;margin-bottom:0.5rem">Your private nicknames for friends' public usernames — only you see these.</p>
     <div id="aliases-list"></div>
     <form id="alias-form" style="display:flex;gap:0.4rem;margin-top:0.6rem" onsubmit="return false">
       <input id="alias-username-input" aria-label="Username to alias" placeholder="Username (e.g. GorillaNK4P)" style="flex:1;padding:6px 10px;background:rgba(21,149,178,0.08);border:1px solid rgba(21,149,178,0.3);border-radius:8px;color:#e2e8f0;font-size:0.8rem;font-family:inherit;outline:none">

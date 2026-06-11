@@ -1,0 +1,29 @@
+{
+  "tags": [
+    "wcag2a",
+    "wcag2aa",
+    "wcag21a",
+    "wcag21aa"
+  ],
+  "generatedFor": "Story 0.10 (UX-DR17)",
+  "scenarios": [
+    {
+      "key": "unauth-landing",
+      "label": "Unauthenticated landing (login modal open)",
+      "blocking": [],
+      "other": []
+    },
+    {
+      "key": "authed-feed",
+      "label": "Authenticated public-feed",
+      "blocking": [],
+      "other": []
+    },
+    {
+      "key": "private-channel",
+      "label": "Private-channel view (active + messages)",
+      "blocking": [],
+      "other": []
+    }
+  ]
+}

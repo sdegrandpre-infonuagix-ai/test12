@@ -11,7 +11,8 @@
     "build:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/dist/tailwind.css --minify",
     "watch:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/dist/tailwind.css --watch",
     "monitor:ralph": "node scripts/ralph-usage-monitor.mjs",
-    "monitor:ralph:once": "node scripts/ralph-usage-monitor.mjs --once"
+    "monitor:ralph:once": "node scripts/ralph-usage-monitor.mjs --once",
+    "test:a11y": "node tests/a11y-audit.test.js"
   },
   "bin": {
     "test12": "./server.js"
@@ -40,7 +41,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "autoprefixer": "^10.4.20",
+    "playwright": "^1.60.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17"
   }
