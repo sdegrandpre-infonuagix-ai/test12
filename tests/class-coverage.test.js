@@ -41,7 +41,34 @@ const TAILWIND_UTILITY_PATTERNS = [
   /^(visible|invisible|collapse)$/,
   /^(flex-1|flex-auto|flex-none|flex-col|flex-row|flex-wrap|flex-shrink|flex-grow|shrink|grow)/,
 ];
-const isTailwindUtility = (name) => TAILWIND_UTILITY_PATTERNS.some((re) => re.test(name));
+// Tailwind variant prefixes (state/responsive/media). A class like
+// `focus-visible:ring-2` is the `ring-2` utility under the `focus-visible:`
+// variant; Tailwind compiles it to a `.focus-visible\:ring-2:focus-visible`
+// selector (colon escaped), which the plain `.<class>` lookup below cannot
+// match. Strip recognized variant prefixes before the utility/selector check
+// so variant-prefixed utilities (introduced from Story 1.3 onward — focus
+// rings, active scale, and the motion-safe/md responsive variants the sheet
+// uses) are trusted the same as their bare forms.
+const VARIANT_PREFIXES = [
+  'hover', 'focus', 'focus-visible', 'focus-within', 'active', 'disabled',
+  'visited', 'checked', 'required', 'group-hover', 'peer-focus', 'peer-checked',
+  'motion-safe', 'motion-reduce', 'dark', 'first', 'last', 'odd', 'even',
+  'sm', 'md', 'lg', 'xl', '2xl',
+];
+const stripVariants = (name) => {
+  let n = name;
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const v of VARIANT_PREFIXES) {
+      if (n.startsWith(v + ':')) { n = n.slice(v.length + 1); changed = true; }
+    }
+  }
+  return n;
+};
+const isTailwindUtility = (name) => {
+  const base = stripVariants(name);
+  return TAILWIND_UTILITY_PATTERNS.some((re) => re.test(base));
+};
 
 test('every class in index.html resolves to a CSS rule (or known Tailwind utility)', () => {
   const classRefs = new Set();
