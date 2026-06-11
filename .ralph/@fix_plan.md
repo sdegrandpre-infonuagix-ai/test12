@@ -23,7 +23,7 @@
 ### Visible Mode Status
 > Goal: The user always knows where they are. Badge in the header shows current mode + cost tier; voice-command switches in PTT update the badge.
 
-- [ ] Story 1.1: Establish vmode-* code region in index.html with MODES config and FSM shell
+- [x] Story 1.1: Establish vmode-* code region in index.html with MODES config and FSM shell
   > As a **developer building the switcher**
   > I want **a clearly-marked code region in `index.html` containing the `MODES` config and an FSM shell with an `idle` state**
   > So that **all subsequent switcher work has a defined home and the boundary against existing code is explicit**.

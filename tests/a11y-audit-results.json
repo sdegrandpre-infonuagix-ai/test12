@@ -9,7 +9,7 @@
   "scenarios": [
     {
       "key": "unauth-landing",
-      "label": "Unauthenticated landing (login modal open)",
+      "label": "Unauthenticated landing",
       "blocking": [],
       "other": []
     },
@@ -21,7 +21,7 @@
     },
     {
       "key": "private-channel",
-      "label": "Private-channel view (active + messages)",
+      "label": "Private-channel view",
       "blocking": [],
       "other": []
     }

@@ -9,5 +9,9 @@ patch-aliases.js
 .ralph/logs/
 _bmad-output/
 public/dist/
-test-results/
+
+# Playwright test runner artifacts
 playwright-report/
+test-results/
+.last-run.json
+blob-report/
