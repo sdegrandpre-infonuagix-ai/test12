@@ -61,7 +61,9 @@ Write-Host "  Tailwind CSS built: public/dist/tailwind.css"
 # ── 1. Package Web UI ZIP ──
 Write-Host "Step 1/8 - Packaging Web UI ZIP..." -ForegroundColor Yellow
 npm install --omit=dev 2>&1 | Out-Null
-Build-LambdaZip "bundle.zip" @("app.js","lambda.js","db.js","mcp-tools.js","ws-broadcast.js","package.json","node_modules","public")
+# logger.js + metrics.js: Epic 7 observability modules required by app.js — MUST
+# be bundled or the Lambda crashes on require('./logger').
+Build-LambdaZip "bundle.zip" @("app.js","lambda.js","db.js","logger.js","metrics.js","mcp-tools.js","ws-broadcast.js","package.json","node_modules","public")
 Write-Host "  Web UI ZIP created."
 
 # ── 2. Package MCP Server ZIP ──
