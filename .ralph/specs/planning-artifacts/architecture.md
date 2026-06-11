@@ -825,8 +825,17 @@ This is **deferred decision #3**.
 
 **Decision INFRA3: No observability infrastructure beyond existing telemetry**
 
-- **Choice:** Mode-switch telemetry rows in `usage_logs` (Decision
-  D2) are the entire observability story for MVP. No CloudWatch
+> ⚠️ **SUPERSEDED 2026-06-11 by Epic 7 (CloudWatch Observability).** This
+> deferral no longer holds: CloudWatch is now in scope — EMF custom metrics,
+> structured logs, alarms→SNS, an operator dashboard, and X-Ray tracing across
+> the three Lambdas. See
+> `specs/planning-artifacts/epic-7-cloudwatch-observability.md`. `usage_logs` +
+> the API5 admin endpoint are retained (per-user billing/bake-off record);
+> CloudWatch is the operational layer added on top. The original MVP rationale
+> below is kept for history.
+
+- **Choice (original, superseded):** Mode-switch telemetry rows in `usage_logs`
+  (Decision D2) are the entire observability story for MVP. No CloudWatch
   custom metrics, no X-Ray traces, no APM. The admin endpoint
   (Decision API5) is the operator dashboard.
 - **Rationale:** Solo-operator project; adding observability infra
