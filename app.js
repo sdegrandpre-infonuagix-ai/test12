@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
 const logger = require('./logger');
+const tracing = require('./tracing'); // Epic 7 / Story 7.5 — X-Ray (no-op unless enabled)
 const { getCurrentInvoke } = require('@vendia/serverless-express');
 const { OAuth2Client } = require('google-auth-library');
 
@@ -758,8 +759,8 @@ app.delete('/mcp', (req, res) => {
 // WebSocket broadcast (uses API Gateway Management API + DynamoDB)
 const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
-const sns = new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const sns = tracing.captureClient(new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' }));
+const ses = tracing.captureClient(new SESClient({ region: process.env.AWS_REGION || 'us-east-1' }));
 const SES_FROM = process.env.SES_FROM || 'noreply@test12.net';
 const wsBroadcast = require('./ws-broadcast');
 

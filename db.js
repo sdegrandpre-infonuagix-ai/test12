@@ -4,6 +4,7 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, QueryCommand, DeleteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const crypto = require('crypto');
 const path = require('path');
+const tracing = require('./tracing'); // Epic 7 / Story 7.5 — X-Ray (no-op unless enabled)
 
 const TABLE = process.env.DDB_DATA_TABLE || 'test12-data';
 const MAX_LEVEL = 3;
@@ -113,7 +114,7 @@ function fmtPost(i) {
 
 async function init() {
   try {
-    const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
+    const client = tracing.captureClient(new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' }));
     const candidate = DynamoDBDocumentClient.from(client, {
       marshallOptions: { removeUndefinedValues: true },
     });
