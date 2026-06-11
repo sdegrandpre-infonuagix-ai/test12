@@ -2245,6 +2245,12 @@ function updateAgentUI() {
     disconnectBtn.style.display = 'none';
     setStatus('Tap to speak');
   }
+
+  // Story 1.4 (FE3): updateAgentUI() is the one funnel every mode-change path
+  // already calls, so repaint the voice-mode badge here to keep it in lockstep
+  // with VA_MODE. Appended (not woven into the branches above) so existing
+  // connect-label / status / orb behaviour is untouched (NFR12).
+  renderVoiceModeBadge();
 }
 
 // ── Realtime WebSocket state (shared by xAI and OpenAI) ──
