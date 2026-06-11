@@ -494,6 +494,9 @@
       <button id="profile-btn" class="header-login-link" style="position:static;">Profile</button>
       <button id="logout-btn" class="header-login-link" style="position:static;">Sign out</button>
     </div>
+    <!-- Voice-Mode Switcher: ARIA live region (UX-DR10 / Story 1.2). Persistent,
+         visually hidden; announceVoiceMode() writes mode changes here for SR users. -->
+    <div id="vmode-aria-live" aria-live="polite" aria-atomic="true" class="sr-only"></div>
     <p>
       Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, create private channels and invite a friends through SMS, change agent to Sonnet, xAI Voice Agent or OpenAI Realtime Agent. All agents support many languages!
     </p>
@@ -591,7 +594,8 @@
 //  Voice-Mode Switcher (PRD: voice-mode-switcher)
 //  Components, FSM, polling, heartbeat, telemetry.
 //  All symbols prefixed `vmode*` for traceability.
-//  ── Story 1.1: MODES config + FSM shell (idle state) only.
+//  ── Story 1.1: MODES config + FSM shell (idle state).
+//  ── Story 1.2: announceVoiceMode() ARIA-live helper.
 //     Subsequent stories extend this region; do NOT mutate
 //     symbols outside it.
 // ═══════════════════════════════════════════════════
@@ -638,6 +642,17 @@ const MODES = Object.freeze([
   }),
 ]);
 
+// ─── Story 1.2: ARIA live announcements (UX-DR10 / NFR19) ───
+// Single persistent polite live region in the header chrome (#vmode-aria-live)
+// is the one channel for telling screen-reader users the mode changed. Writing
+// text content triggers the announcement; aria-atomic="true" re-reads the whole
+// message each time. Callers across later stories (voice-command switch in 1.5,
+// tap-switch in Epic 2) funnel their messages through this one helper.
+function announceVoiceMode(text) {
+  const region = document.getElementById('vmode-aria-live');
+  if (region) region.textContent = text;
+}
+
 // Finite-state-machine shell. All mode-switch state changes flow through
 // `vmodeFsm.transition(event, payload)` — direct mutation of `.state` is
 // forbidden (architecture Communication Patterns). Story 1.1 ships the
@@ -656,7 +671,7 @@ const vmodeFsm = {
     return to;
   },
 };
-// ─── end Voice-Mode Switcher region (Story 1.1) ───
+// ─── end Voice-Mode Switcher region (Stories 1.1–1.2) ───
 
 // ═══════════════════════════════════════════════════
 //  PWA — Service Worker Registration
