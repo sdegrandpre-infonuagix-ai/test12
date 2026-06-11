@@ -15,11 +15,13 @@ const { test, expect } = require('@playwright/test');
 
 // variant/tierName/rgb are fixed by the design; name/chip/icon are asserted
 // against the live MODES config in-page to avoid emoji-encoding drift.
+// rgb values are the WCAG-AA tier shades (darker teal/red so white badge text
+// clears 4.5:1 — see the contrast note in src/styles/tailwind.css).
 const VARIANTS = [
-  { mode_id: 'llm',           variant: 'vmode-badge-free',    tierName: 'Free',    rgb: 'rgb(21, 149, 178)' },
+  { mode_id: 'llm',           variant: 'vmode-badge-free',    tierName: 'Free',    rgb: 'rgb(14, 116, 144)' },
   { mode_id: 'deluxe-claude', variant: 'vmode-badge-paid',    tierName: 'Paid',    rgb: 'rgb(245, 158, 11)' },
   { mode_id: 'deluxe-xai',    variant: 'vmode-badge-paid',    tierName: 'Paid',    rgb: 'rgb(245, 158, 11)' },
-  { mode_id: 'deluxe-openai', variant: 'vmode-badge-premium', tierName: 'Premium', rgb: 'rgb(239, 68, 68)' },
+  { mode_id: 'deluxe-openai', variant: 'vmode-badge-premium', tierName: 'Premium', rgb: 'rgb(220, 38, 38)' },
 ];
 
 test.describe('Story 1.3 — vmode-badge (display-only)', () => {
