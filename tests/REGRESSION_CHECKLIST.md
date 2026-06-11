@@ -7,9 +7,8 @@ the matrix and confirm no regression.
 
 Before starting:
 - Run `npm install`, then `npm run build:css`.
-- Confirm automated checks pass: `node tests/tailwind-smoke.test.js`
-  and `node tests/class-coverage.test.js` — both already green at the
-  time of writing.
+- Confirm automated checks pass: `npm test` (runs the full
+  @playwright/test suite — tailwind-smoke, class-coverage, a11y, vmode).
 - Open the app in a private/incognito window so a stale service-worker
   cache from `test12-v5` doesn't mask issues. The new SW
   (`test12-v6`, Story 0.7) will register on first load.
@@ -67,11 +66,16 @@ For each device, walk through every flow below. Tick off as you go.
 
 ## Automated checks (run before manual)
 - `npm run build:css` — produces `public/dist/tailwind.css` in <5s
-- `node tests/tailwind-smoke.test.js` — all 14 brand tokens compile to
-  the expected color/shadow values
-- `node tests/class-coverage.test.js` — every `class="..."` token in
-  `public/index.html` resolves to a CSS rule (catches "I forgot to
-  migrate this" regressions)
+- `npm test` — full @playwright/test suite:
+  - tailwind-smoke — all 14 brand tokens compile to the expected
+    color/shadow values
+  - class-coverage — every `class="..."` token in `public/index.html`
+    resolves to a CSS rule (catches "I forgot to migrate this" regressions)
+  - a11y-audit — zero serious/critical WCAG 2.1 AA violations across the
+    three view states
+  - vmode-config — MODES config + FSM shell invariants (Story 1.1)
+- Run a single file with e.g. `npm run test:a11y` / `npm run test:vmode`,
+  or `npm run test:ui` for the interactive watch UI.
 
 ## Known caveats (not regressions)
 - `.login-field-label`, `.login-field-wrap`, `.login-title` were dead

@@ -1083,6 +1083,27 @@ switcher follows them; AI agents must not deviate.
   separate decision; the switcher does not introduce its own test
   framework.
 
+**ADR-2026-06-11 — Adopt `@playwright/test` as the project test framework
+(amends the "existing norm" bullet above):**
+
+- **Context:** The operator directed adopting a real TDD framework
+  (overriding the manual-only norm) so each story ships with executable,
+  story-scoped tests written test-first.
+- **Decision:** Adopt **`@playwright/test`** as the single project test
+  framework. Rationale: the app is a monolithic `index.html` that only a
+  real browser can boot (jsdom cannot load it), so browser-capable testing
+  is mandatory; Playwright + Chromium is already vendored (Story 0.10). One
+  suite runs both pure-node checks (Tailwind tokens, class coverage) and
+  real-browser checks (a11y audit, vmode FSM, and future switcher UI
+  stories — badge, sheet, transitions).
+- **Consequences:** `npm test` runs the suite; specs live in
+  `tests/*.test.js`; a loopback static server (`tests/support/serve.js`)
+  provides a real origin via Playwright's `webServer`. AR12 still holds —
+  tests are not switcher *implementation* code, so the switcher adds no new
+  top-level implementation module. This supersedes the "switcher does not
+  introduce its own test framework" clause: the framework is now
+  project-wide, not switcher-specific.
+
 ### Format Patterns
 
 **API request / response formats:**

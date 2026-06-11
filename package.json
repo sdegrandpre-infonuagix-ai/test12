@@ -12,8 +12,10 @@
     "watch:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/dist/tailwind.css --watch",
     "monitor:ralph": "node scripts/ralph-usage-monitor.mjs",
     "monitor:ralph:once": "node scripts/ralph-usage-monitor.mjs --once",
-    "test:a11y": "node tests/a11y-audit.test.js",
-    "test:vmode": "node tests/vmode-config.test.js"
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:a11y": "playwright test a11y-audit",
+    "test:vmode": "playwright test vmode-config"
   },
   "bin": {
     "test12": "./server.js"
@@ -43,6 +45,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
+    "@playwright/test": "^1.60.0",
     "autoprefixer": "^10.4.20",
     "playwright": "^1.60.0",
     "postcss": "^8.4.49",
