@@ -1,4 +1,20 @@
 
+## Git Workflow (Gitflow)
+
+This repo follows **Gitflow** (with a QA staging tier). Long-lived branches, promotion flows downstream `develop → qa → main`:
+
+- **`develop`** — integration branch. All story/feature work merges here first.
+- **`qa`** — staging/verification branch. `develop` is promoted here for QA before release; only fixes that pass QA flow onward.
+- **`main`** — production releases only. Never commit story work or open story PRs directly against `main` (or `qa`).
+
+Story work:
+
+1. Branch each story off `develop`, keeping the BMAD `story/<epic>.<n>-<slug>` name (e.g. `story/1.2-vmode-aria-live`). This fills Gitflow's `feature/*` role — the prefix is just convention.
+2. Commit the story's work on that branch (test-first per the Playwright TDD setup).
+3. Open a PR with **base = `develop`** (GitHub defaults to `main` — change it). Use `gh pr create --base develop`.
+4. Stacked stories (a story built on an unmerged parent) merge in dependency order: parent → `develop` first, then the child PR auto-reduces to its own diff.
+5. Promotion: `develop` → `qa` (PR) for staging verification, then `qa` → `main` (PR) cut as a `release/*` and tagged. Hotfixes branch off `main` and merge back into `main`, `qa`, and `develop`.
+
 ## BMAD-METHOD Integration
 
 Use `/bmalph` to navigate phases. Use `/bmad-help` to discover all commands. Use `/bmalph-status` for a quick overview. See `_bmad/COMMANDS.md` for a full command reference.

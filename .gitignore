@@ -3,6 +3,7 @@ node_modules
 *.db
 *.zip
 dev.local.ps1
+scripts/open-prs.ps1
 scratch-xai.js
 patch-aliases.js
 .ralph/logs/

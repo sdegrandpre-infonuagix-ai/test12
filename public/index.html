@@ -497,6 +497,22 @@
     <!-- Voice-Mode Switcher: ARIA live region (UX-DR10 / Story 1.2). Persistent,
          visually hidden; announceVoiceMode() writes mode changes here for SR users. -->
     <div id="vmode-aria-live" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <!-- Voice-Mode Switcher: status badge (UX-DR3 / Story 1.3). Display-only —
+         shows the active mode + cost tier at a glance (FR1/FR8). The tier colour
+         reinforces the literal Free/$$/$$$ chip text, never replaces it (FR9).
+         Hidden until authenticated, mirroring #header-auth-btns; renderVoiceModeBadge()
+         reveals + repaints it. aria-expanded is a placeholder until Epic 2 wires
+         the sheet. Initial static content = the default 'llm' (Haiku 4.5) mode. -->
+    <button type="button" id="vmode-badge"
+            class="vmode-badge vmode-badge-free focus-visible:ring-2 focus-visible:ring-brand-teal active:scale-95"
+            aria-expanded="false"
+            aria-label="Voice mode: Haiku 4.5, Free tier. Tap to switch."
+            style="display:none">
+      <span class="vmode-badge-icon" aria-hidden="true">🎙️</span>
+      <span class="vmode-badge-name">Haiku 4.5</span>
+      <span class="vmode-badge-dot" aria-hidden="true">·</span>
+      <span class="vmode-badge-chip">Free</span>
+    </button>
     <p>
       Manage a chatroom vocally. Tap the button, speak naturally — the agent can read posts, create posts, create private channels and invite a friends through SMS, change agent to Sonnet, xAI Voice Agent or OpenAI Realtime Agent. All agents support many languages!
     </p>
@@ -596,6 +612,7 @@
 //  All symbols prefixed `vmode*` for traceability.
 //  ── Story 1.1: MODES config + FSM shell (idle state).
 //  ── Story 1.2: announceVoiceMode() ARIA-live helper.
+//  ── Story 1.3: renderVoiceModeBadge() display-only header pill.
 //     Subsequent stories extend this region; do NOT mutate
 //     symbols outside it.
 // ═══════════════════════════════════════════════════
@@ -671,7 +688,45 @@ const vmodeFsm = {
     return to;
   },
 };
-// ─── end Voice-Mode Switcher region (Stories 1.1–1.2) ───
+
+// ─── Story 1.3: vmode-badge render (UX-DR3 / FR1, FR8, FR9) ───
+// Paints the header pill from the active VA_MODE: icon + mode name + center-dot
+// + cost-tier chip. The variant class carries the tier background (teal / amber
+// / red) — colour only reinforces the literal Free/$$/$$$ chip text, it never
+// replaces it (FR9, redundant text+colour signalling). Display-only here: the
+// badge is not interactive until Epic 2 wires the sheet, and the render is not
+// yet auto-called from updateAgentUI() (Story 1.4). Visibility mirrors
+// #header-auth-btns — the badge only makes sense once a user is signed in.
+const VMODE_BADGE_VARIANTS = Object.freeze({
+  free: 'vmode-badge-free',
+  paid: 'vmode-badge-paid',
+  premium: 'vmode-badge-premium',
+});
+// Spoken tier name for the aria-label (the chip shows the terse $$ glyphs).
+const VMODE_TIER_NAMES = Object.freeze({ free: 'Free', paid: 'Paid', premium: 'Premium' });
+
+function renderVoiceModeBadge() {
+  const badge = document.getElementById('vmode-badge');
+  if (!badge) return;
+  const mode = MODES.find((m) => m.mode_id === VA_MODE) || MODES[0];
+
+  badge.querySelector('.vmode-badge-icon').textContent = mode.icon;
+  badge.querySelector('.vmode-badge-name').textContent = mode.mode_name;
+  badge.querySelector('.vmode-badge-chip').textContent = mode.tier_label;
+
+  // Swap only the tier-variant class; keep the structural + utility classes.
+  Object.values(VMODE_BADGE_VARIANTS).forEach((c) => badge.classList.remove(c));
+  badge.classList.add(VMODE_BADGE_VARIANTS[mode.cost_tier] || VMODE_BADGE_VARIANTS.free);
+
+  const tierName = VMODE_TIER_NAMES[mode.cost_tier] || mode.tier_label;
+  badge.setAttribute('aria-label', `Voice mode: ${mode.mode_name}, ${tierName} tier. Tap to switch.`);
+
+  // Reveal only for an authenticated user (mirrors #header-auth-btns). Guarded
+  // typeof: currentUser is declared later in the script's lexical scope.
+  const authed = typeof currentUser !== 'undefined' && !!currentUser;
+  badge.style.display = authed ? 'inline-flex' : 'none';
+}
+// ─── end Voice-Mode Switcher region (Stories 1.1–1.3) ───
 
 // ═══════════════════════════════════════════════════
 //  PWA — Service Worker Registration
