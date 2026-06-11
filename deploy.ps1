@@ -373,6 +373,17 @@ Write-Host "`n  Setting up Function URLs..."
 $WEB_URL = Ensure-FunctionUrl -FnName $APP_NAME
 $MCP_URL = Ensure-FunctionUrl -FnName $MCP_NAME
 
+# ── 9. CloudWatch observability — alarms (Epic 7 / Story 7.6) ──
+# Idempotent: ensures the test12-alerts SNS topic and upserts the alarms.
+# Non-fatal — a missing cloudwatch:PutMetricAlarm / sns:CreateTopic grant on the
+# deploying principal should warn, not abort an otherwise-good code deploy.
+Write-Host "`nStep 9 - Provisioning CloudWatch alarms..." -ForegroundColor Yellow
+$env:AWS_REGION = $REGION
+node scripts/cloudwatch/provision-alarms.js
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  WARNING: alarm provisioning failed (exit $LASTEXITCODE). Check IAM (cloudwatch:PutMetricAlarm, sns:CreateTopic) — code deploy is unaffected." -ForegroundColor Yellow
+}
+
 Write-Host "`nDeployment complete!" -ForegroundColor Green
 Write-Host "Web UI (PROD) : $WEB_URL" -ForegroundColor Cyan
 Write-Host "MCP endpoint : ${MCP_URL}mcp" -ForegroundColor Cyan
