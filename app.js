@@ -6,10 +6,59 @@ const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 const fetch = require('node-fetch');
 const path = require('path');
+const crypto = require('crypto');
 const db = require('./db');
+const logger = require('./logger');
+const { getCurrentInvoke } = require('@vendia/serverless-express');
 const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
+
+// ──────────────────────────────────────────────
+//  Epic 7 / Story 7.2 — Request observability
+//  Mounted FIRST so it wraps every route (and static): one structured access
+//  log + EMF RequestCount/LatencyMs per request. Route labels use the express
+//  path pattern (req.route.path), collapsing anything unmatched/static to
+//  'unmatched' to keep custom-metric dimension cardinality bounded. The whole
+//  thing is wrapped so observability can never throw into the request path.
+// ──────────────────────────────────────────────
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+
+  // In Lambda, reuse the invocation's request id so logs/metrics correlate with
+  // the X-Ray trace and CloudWatch request. Locally there is no invoke context.
+  let requestId;
+  try {
+    const { context } = getCurrentInvoke() || {};
+    requestId = context && context.awsRequestId;
+  } catch (_e) { /* not running under serverless-express */ }
+  if (!requestId) requestId = crypto.randomUUID();
+  req.requestId = requestId;
+
+  res.on('finish', () => {
+    try {
+      const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+      // req.route is only set when a route matched; baseUrl prefixes mounted
+      // routers. Static files and 404s have neither → 'unmatched'.
+      let route = 'unmatched';
+      if (req.route && req.route.path) route = (req.baseUrl || '') + req.route.path;
+      else if (req.baseUrl) route = req.baseUrl;
+      const status = String(res.statusCode);
+
+      logger.info('request', {
+        method: req.method,
+        route,
+        status,
+        durationMs: Math.round(durationMs),
+        requestId,
+      });
+      logger.metric('RequestCount', 1, 'Count', { Route: route, Method: req.method, Status: status }, { requestId });
+      logger.metric('LatencyMs', durationMs, 'Milliseconds', { Route: route }, { requestId });
+    } catch (_e) { /* observability must never break the response */ }
+  });
+
+  next();
+});
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
