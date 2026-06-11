@@ -1,0 +1,16 @@
+{
+  "_comment": "Epic 7 / Story 7.5 — X-Ray permissions for the test12-lambda-role. Attach to the shared role (e.g. `aws iam put-role-policy --role-name test12-lambda-role --policy-name test12-xray --policy-document file://xray-policy.json`), or attach the AWS managed policy AWSXRayDaemonWriteAccess. Required for the Lambdas (deployed with --tracing-config Mode=Active) to flush trace segments. Same manual-attach convention as sns-ses-policy.json.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
 const logger = require('./logger');
+const tracing = require('./tracing'); // Epic 7 / Story 7.5 — X-Ray (no-op unless enabled)
 const { getCurrentInvoke } = require('@vendia/serverless-express');
 const { OAuth2Client } = require('google-auth-library');
 
@@ -758,8 +759,8 @@ app.delete('/mcp', (req, res) => {
 // WebSocket broadcast (uses API Gateway Management API + DynamoDB)
 const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
-const sns = new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const ses = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const sns = tracing.captureClient(new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' }));
+const ses = tracing.captureClient(new SESClient({ region: process.env.AWS_REGION || 'us-east-1' }));
 const SES_FROM = process.env.SES_FROM || 'noreply@test12.net';
 const wsBroadcast = require('./ws-broadcast');
 
@@ -1806,6 +1807,39 @@ app.get('/config.js', (req, res) => {
 // ──────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ──────────────────────────────────────────────
+//  Epic 7 / Story 7.4 — Central error handler
+//  Mounted LAST. Express routes the 4-arg signature here on any thrown or
+//  forwarded error (e.g. malformed JSON from the body parser, or an unhandled
+//  route throw). Emits a structured error log + EMF ErrorCount (dims
+//  ErrorClass, Route), then sends a sane response. The emission is guarded so
+//  it can never mask the original failure.
+// ──────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  const errorClass = (err && (err.name || (err.constructor && err.constructor.name))) || 'Error';
+  let route = 'unmatched';
+  if (req.route && req.route.path) route = (req.baseUrl || '') + req.route.path;
+  else if (req.baseUrl) route = req.baseUrl;
+
+  try {
+    logger.error('request_error', {
+      errorClass,
+      message: err && err.message,
+      status,
+      route,
+      method: req.method,
+      requestId: req.requestId,
+      stack: err && err.stack,
+    });
+    logger.metric('ErrorCount', 1, 'Count', { ErrorClass: errorClass, Route: route }, { requestId: req.requestId });
+  } catch (_e) { /* observability must never mask the original error */ }
+
+  if (res.headersSent) return next(err);
+  res.status(status).json({ error: status >= 500 ? 'Internal server error' : (err.message || 'Request error') });
 });
 
 // Init DB (non-blocking — Lambda cold starts benefit from this being async)
