@@ -14,7 +14,7 @@
 - [x] Story 0.7: Update sw.js to include dist/tailwind.css and bump CACHE_VERSION
 - [x] Story 0.8: Update deploy scripts to invoke build:css
 - [x] Story 0.9: Final regression pass on existing flows
-- [ ] Story 0.10: Verify existing UI accessibility baseline (UX-DR17)
+- [x] Story 0.10: Verify existing UI accessibility baseline (UX-DR17)
   > As a **test12 user with assistive needs**
   > I want **the existing header chrome and core flows to meet WCAG 2.1 AA before the switcher commits to AA**
   > So that **the new switcher doesn't inherit unfixable accessibility debt from its surrounding context**.
@@ -23,7 +23,7 @@
 ### Visible Mode Status
 > Goal: The user always knows where they are. Badge in the header shows current mode + cost tier; voice-command switches in PTT update the badge.
 
-- [ ] Story 1.1: Establish vmode-* code region in index.html with MODES config and FSM shell
+- [x] Story 1.1: Establish vmode-* code region in index.html with MODES config and FSM shell
   > As a **developer building the switcher**
   > I want **a clearly-marked code region in `index.html` containing the `MODES` config and an FSM shell with an `idle` state**
   > So that **all subsequent switcher work has a defined home and the boundary against existing code is explicit**.

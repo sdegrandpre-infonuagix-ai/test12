@@ -69,7 +69,8 @@
     gap: 6px;
   }
   .aub-label {
-    @apply font-bold uppercase text-text-muted whitespace-nowrap text-left;
+    /* Story 0.10 (UX-DR17): text-text-muted (#64748b) → #94a3b8 for WCAG AA contrast on dark */
+    @apply font-bold uppercase text-[#94a3b8] whitespace-nowrap text-left;
     font-size: 0.6rem;
     letter-spacing: 0.04em;
   }
@@ -109,8 +110,9 @@
     margin: 0 1.5rem 1rem;
   }
   .channels-section h2 {
+    /* Story 0.10 (UX-DR17): text-text-muted (#64748b) → #94a3b8 for WCAG AA contrast on dark */
     @apply text-[0.75rem] font-semibold uppercase tracking-[0.08em]
-           text-text-muted mb-[0.5rem];
+           text-[#94a3b8] mb-[0.5rem];
   }
   .channel-panel {
     @apply bg-[rgba(15,23,42,0.6)] backdrop-blur-[16px]
@@ -130,7 +132,8 @@
     @apply text-[0.95rem] font-semibold text-text-primary;
   }
   .channel-panel .ch-meta {
-    @apply text-[0.72rem] text-text-muted mt-[2px];
+    /* Story 0.10 (UX-DR17): text-text-muted (#64748b) → #94a3b8 for WCAG AA contrast */
+    @apply text-[0.72rem] text-[#94a3b8] mt-[2px];
   }
   .channel-panel .ch-id {
     @apply inline-block bg-[rgba(99,102,241,0.15)] text-[#a78bfa]
@@ -150,7 +153,8 @@
   }
   .ch-msg b { @apply text-[#cbd5e1] font-semibold; }
   .ch-msg:last-child { @apply border-b-0; }
-  .ch-empty { @apply text-[0.75rem] text-[#475569] italic; }
+  /* Story 0.10 (UX-DR17): empty-state text #475569 → #94a3b8 for WCAG AA contrast */
+  .ch-empty { @apply text-[0.75rem] text-[#94a3b8] italic; }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -215,8 +219,11 @@
   .btn:active { transform: scale(0.96); }
   .btn:disabled { @apply opacity-40 cursor-not-allowed; }
   .btn-primary {
+    /* Story 0.10 (UX-DR17): bg #1595b2 → #0e7490 so white label meets WCAG AA
+     * (white-on-#1595b2 was 3.51:1; white-on-#0e7490 ≈ 5.4:1). #0e7490 is
+     * already in the palette (compose-btn gradient end, orb deep teal). */
     @apply text-white;
-    background: #1595b2;
+    background: #0e7490;
     box-shadow: 0 4px 20px rgba(21, 149, 178, 0.4);
   }
   .btn-primary:hover { box-shadow: 0 6px 28px rgba(21, 149, 178, 0.6); }
@@ -422,7 +429,8 @@
     @apply flex items-center;
     gap: 0.75rem;
     margin: 1.1rem 0 0.9rem;
-    color: #9ca3af;
+    /* Story 0.10 (UX-DR17): #9ca3af (2.53:1 on white) → #6b7280 (≈4.8:1) for WCAG AA */
+    color: #6b7280;
     font-size: 0.8rem;
   }
   .login-divider::before,

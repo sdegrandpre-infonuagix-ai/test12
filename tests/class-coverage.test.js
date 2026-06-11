@@ -4,35 +4,22 @@
 // to public/dist/tailwind.css) or a surviving rule in the inline <style>
 // block. Catches "I forgot to migrate this class" regressions from
 // Stories 0.3–0.6.
+//
+// Pure-node check (no browser) — runs under @playwright/test.
 
 const fs = require('fs');
 const path = require('path');
+const { test, expect } = require('@playwright/test');
 
-const ROOT     = path.join(__dirname, '..');
-const HTML     = fs.readFileSync(path.join(ROOT, 'public', 'index.html'),     'utf8');
-const TWCSS    = fs.readFileSync(path.join(ROOT, 'public', 'dist', 'tailwind.css'), 'utf8');
+const ROOT = path.join(__dirname, '..');
+const HTML = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
+const TWCSS = fs.readFileSync(path.join(ROOT, 'public', 'dist', 'tailwind.css'), 'utf8');
 
 // Inline <style> block — between first <style> and </style> in head
 const styleMatch = HTML.match(/<style>([\s\S]*?)<\/style>/);
 const INLINE_CSS = styleMatch ? styleMatch[1] : '';
 
-// Collect class tokens from every class="..." attribute. Skip Tailwind
-// arbitrary-value classes since they're per-element utilities (e.g.
-// flex-1, px-[14px]) — we trust Tailwind's purge to keep them.
-const classRefs = new Set();
-for (const m of HTML.matchAll(/\sclass="([^"]+)"/g)) {
-  for (const tok of m[1].split(/\s+/)) {
-    if (!tok) continue;
-    // Skip JS template-literal placeholders like ${fillClass}: the
-    // substituted value (e.g. "ok"/"warn"/"full") is a separate concrete
-    // token elsewhere in the JS and covered by its own rule.
-    if (tok.startsWith('${') || tok.includes('${')) continue;
-    classRefs.add(tok);
-  }
-}
-
-// Allowlist: Tailwind utility class prefixes / patterns we trust. If a
-// class starts with any of these, we don't require it to appear in CSS.
+// Tailwind utility class prefixes / patterns we trust without a CSS lookup.
 const TAILWIND_UTILITY_PATTERNS = [
   /^(absolute|relative|fixed|sticky|static)$/,
   /^(flex|inline-flex|grid|block|inline|inline-block|hidden|table)/,
@@ -54,30 +41,27 @@ const TAILWIND_UTILITY_PATTERNS = [
   /^(visible|invisible|collapse)$/,
   /^(flex-1|flex-auto|flex-none|flex-col|flex-row|flex-wrap|flex-shrink|flex-grow|shrink|grow)/,
 ];
-function isTailwindUtility(name) {
-  return TAILWIND_UTILITY_PATTERNS.some(re => re.test(name));
-}
+const isTailwindUtility = (name) => TAILWIND_UTILITY_PATTERNS.some((re) => re.test(name));
 
-// Component classes from index.html that legitimately ship via tailwind.css
-// (component layer) or remain in inline <style>. The check verifies CSS
-// defines them somewhere. Hidden helper (Tailwind base preflight provides
-// `.hidden { display: none }`) is shipped by Tailwind utility layer.
-const missingFromCss = [];
-for (const cls of classRefs) {
-  if (isTailwindUtility(cls)) continue;
-  const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const selectorRegex = new RegExp(`\\.${escaped}[\\s{,:\\.#~+>\\[]`);
-  const inTailwind = selectorRegex.test(TWCSS);
-  const inInline   = selectorRegex.test(INLINE_CSS);
-  if (!inTailwind && !inInline) {
-    missingFromCss.push(cls);
+test('every class in index.html resolves to a CSS rule (or known Tailwind utility)', () => {
+  const classRefs = new Set();
+  for (const m of HTML.matchAll(/\sclass="([^"]+)"/g)) {
+    for (const tok of m[1].split(/\s+/)) {
+      if (!tok) continue;
+      if (tok.startsWith('${') || tok.includes('${')) continue; // JS template placeholders
+      classRefs.add(tok);
+    }
   }
-}
 
-if (missingFromCss.length) {
-  console.error('FAIL — classes referenced in index.html but not defined in tailwind.css or inline <style>:');
-  for (const c of missingFromCss.sort()) console.error('  -', c);
-  process.exit(1);
-}
+  const missingFromCss = [];
+  for (const cls of classRefs) {
+    if (isTailwindUtility(cls)) continue;
+    const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const selectorRegex = new RegExp(`\\.${escaped}[\\s{,:\\.#~+>\\[]`);
+    if (!selectorRegex.test(TWCSS) && !selectorRegex.test(INLINE_CSS)) {
+      missingFromCss.push(cls);
+    }
+  }
 
-console.log(`PASS — all ${classRefs.size} class-references in index.html resolve to a CSS rule (or are recognized Tailwind utilities).`);
+  expect(missingFromCss.sort(), `classes referenced in index.html but not defined in CSS: ${missingFromCss.join(', ')}`).toEqual([]);
+});
