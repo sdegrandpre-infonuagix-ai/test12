@@ -588,6 +588,77 @@
 
 <script>
 // ═══════════════════════════════════════════════════
+//  Voice-Mode Switcher (PRD: voice-mode-switcher)
+//  Components, FSM, polling, heartbeat, telemetry.
+//  All symbols prefixed `vmode*` for traceability.
+//  ── Story 1.1: MODES config + FSM shell (idle state) only.
+//     Subsequent stories extend this region; do NOT mutate
+//     symbols outside it.
+// ═══════════════════════════════════════════════════
+
+// Mode metadata (Decision D1 / FE2): a single immutable client-side
+// config — one entry per voice mode, read by both the badge and the
+// sheet renders, and the source of truth for cost-tier signalling.
+const MODES = Object.freeze([
+  Object.freeze({
+    mode_id: 'llm',
+    mode_name: 'Haiku 4.5',
+    family: 'ptt',
+    cost_tier: 'free',
+    tier_label: 'Free',
+    caption: 'Tap to speak',
+    icon: '🎙️',
+  }),
+  Object.freeze({
+    mode_id: 'deluxe-claude',
+    mode_name: 'Sonnet 4.6',
+    family: 'ptt',
+    cost_tier: 'paid',
+    tier_label: '$$',
+    caption: 'Tap to speak (Deluxe-Claude)',
+    icon: '🧠',
+  }),
+  Object.freeze({
+    mode_id: 'deluxe-xai',
+    mode_name: 'xAI Grok',
+    family: 'realtime',
+    cost_tier: 'paid',
+    tier_label: '$$',
+    caption: 'Persistent stream · 25 langs',
+    icon: '🌟',
+  }),
+  Object.freeze({
+    mode_id: 'deluxe-openai',
+    mode_name: 'OpenAI Realtime',
+    family: 'realtime',
+    cost_tier: 'premium',
+    tier_label: '$$$',
+    caption: 'Persistent stream',
+    icon: '🌟',
+  }),
+]);
+
+// Finite-state-machine shell. All mode-switch state changes flow through
+// `vmodeFsm.transition(event, payload)` — direct mutation of `.state` is
+// forbidden (architecture Communication Patterns). Story 1.1 ships the
+// shell: it logs every transition and stays in `idle`; later stories add
+// the real state graph (sheet_open, switching, …) and wire callers.
+const vmodeFsm = {
+  state: 'idle',
+  transition(event, payload = {}) {
+    const from = this.state;
+    const to = this.state; // shell: no transitions defined yet (Stories 1.4+)
+    const extra = [];
+    if (payload.source) extra.push(`source=${payload.source}`);
+    if (payload.mode_id) extra.push(`mode=${payload.mode_id}`);
+    const suffix = extra.length ? `, ${extra.join(', ')}` : '';
+    console.log(`[vmode-fsm] ${from} → ${to} (${event}${suffix})`);
+    return to;
+  },
+};
+// ─── end Voice-Mode Switcher region (Story 1.1) ───
+
+// ═══════════════════════════════════════════════════
 //  PWA — Service Worker Registration
 // ═══════════════════════════════════════════════════
 if ('serviceWorker' in navigator) {
