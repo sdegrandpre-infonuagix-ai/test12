@@ -2,9 +2,22 @@
 const serverlessExpress = require('@vendia/serverless-express');
 const app = require('./app');
 const db = require('./db');
+const logger = require('./logger');
 
 let serverlessExpressHandler;
 let dbInitialized = false;
+
+// Epic 7 / Story 7.4 — cold-start signal. Module init runs exactly once per
+// container, so emitting here counts one ColdStart per cold start. Guarded +
+// idempotent so an accidental second call (or a test) never double-counts.
+let coldStartReported = false;
+function reportColdStart() {
+  if (coldStartReported) return;
+  coldStartReported = true;
+  try { logger.metric('ColdStart', 1, 'Count', { Fn: 'web' }); } catch (_e) { /* fire-and-forget */ }
+}
+reportColdStart();
+exports.reportColdStart = reportColdStart;
 
 exports.handler = async (event, context) => {
   // Only latch `dbInitialized` after a SUCCESSFUL init. Setting the flag
@@ -18,7 +31,12 @@ exports.handler = async (event, context) => {
       dbInitialized = true;
       console.log('Lambda DB: connected');
     } else {
-      console.log(`Lambda DB: FAILED — ${db.getLastError()?.message}`);
+      // Story 7.4 — surface DB-init failures as a structured log + metric so
+      // they're alarmable (7.6), not just buried in plain console output.
+      const message = db.getLastError()?.message;
+      logger.error('db_init_failed', { fn: 'web', message });
+      try { logger.metric('DbInitFailure', 1, 'Count', { Fn: 'web' }); } catch (_e) { /* fire-and-forget */ }
+      console.log(`Lambda DB: FAILED — ${message}`);
       // Leave dbInitialized = false so the NEXT request retries init().
     }
   }

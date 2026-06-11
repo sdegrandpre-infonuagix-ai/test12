@@ -61,17 +61,19 @@ Write-Host "  Tailwind CSS built: public/dist/tailwind.css"
 # ── 1. Package Web UI ZIP ──
 Write-Host "Step 1/8 - Packaging Web UI ZIP..." -ForegroundColor Yellow
 npm install --omit=dev 2>&1 | Out-Null
-Build-LambdaZip "bundle.zip" @("app.js","lambda.js","db.js","mcp-tools.js","ws-broadcast.js","package.json","node_modules","public")
+# logger.js + metrics.js + tracing.js: Epic 7 observability modules required by
+# app.js/db.js — MUST be bundled or the Lambda crashes on require('./logger').
+Build-LambdaZip "bundle.zip" @("app.js","lambda.js","db.js","logger.js","metrics.js","tracing.js","mcp-tools.js","ws-broadcast.js","package.json","node_modules","public")
 Write-Host "  Web UI ZIP created."
 
 # ── 2. Package MCP Server ZIP ──
 Write-Host "`nStep 2/8 - Packaging MCP Server ZIP..." -ForegroundColor Yellow
-Build-LambdaZip "mcp-bundle.zip" @("mcp-http.js","mcp-lambda.js","mcp-tools.js","db.js","package.json","node_modules")
+Build-LambdaZip "mcp-bundle.zip" @("mcp-http.js","mcp-lambda.js","mcp-tools.js","db.js","logger.js","metrics.js","tracing.js","package.json","node_modules")
 Write-Host "  MCP ZIP created."
 
 # ── 3. Package WebSocket Lambda ZIP ──
 Write-Host "`nStep 3/8 - Packaging WebSocket Lambda ZIP..." -ForegroundColor Yellow
-Build-LambdaZip "ws-bundle.zip" @("ws-handler.js","ws-broadcast.js","db.js","package.json","node_modules")
+Build-LambdaZip "ws-bundle.zip" @("ws-handler.js","ws-broadcast.js","db.js","logger.js","metrics.js","tracing.js","package.json","node_modules")
 Write-Host "  WS ZIP created."
 
 # ── Helper: deploy a Lambda function (reuses existing prod IAM role) ──
@@ -94,6 +96,7 @@ function Deploy-Lambda {
             --role $ROLE_ARN `
             --memory-size $MEMORY_MB `
             --timeout $TIMEOUT_SEC `
+            --tracing-config Mode=Active `
             --region $REGION `
             --environment "file://$EnvFile"
         if ($LASTEXITCODE -ne 0) { Write-Host "ERROR: Lambda create failed for $FnName." -ForegroundColor Red; exit 1 }
@@ -102,11 +105,13 @@ function Deploy-Lambda {
         aws lambda update-function-code --function-name $FnName --zip-file "fileb://$ZipFile" --region $REGION | Out-Null
         Write-Host "  Waiting for code update..." -ForegroundColor Gray
         aws lambda wait function-updated --function-name $FnName --region $REGION
+        # --tracing-config Mode=Active: Epic 7 / Story 7.5 — enable AWS X-Ray.
         aws lambda update-function-configuration `
             --function-name $FnName `
             --memory-size $MEMORY_MB `
             --timeout $TIMEOUT_SEC `
             --handler $Handler `
+            --tracing-config Mode=Active `
             --environment "file://$EnvFile" `
             --region $REGION | Out-Null
         Write-Host "  Lambda $FnName updated."
@@ -223,6 +228,7 @@ if ($LASTEXITCODE -ne 0) {
         --role $WS_ROLE_ARN `
         --memory-size $MEMORY_MB `
         --timeout $TIMEOUT_SEC `
+        --tracing-config Mode=Active `
         --region $REGION `
         --environment "file://$env:TEMP/test12-ws-env.json"
     if ($LASTEXITCODE -ne 0) { Write-Host "ERROR: WS Lambda create failed." -ForegroundColor Red; exit 1 }
@@ -231,11 +237,13 @@ if ($LASTEXITCODE -ne 0) {
     aws lambda update-function-code --function-name $WS_NAME --zip-file "fileb://ws-bundle.zip" --region $REGION | Out-Null
     Write-Host "  Waiting for code update..." -ForegroundColor Gray
     aws lambda wait function-updated --function-name $WS_NAME --region $REGION
+    # --tracing-config Mode=Active: Epic 7 / Story 7.5 — enable AWS X-Ray.
     aws lambda update-function-configuration `
         --function-name $WS_NAME `
         --memory-size $MEMORY_MB `
         --timeout $TIMEOUT_SEC `
         --handler "ws-handler.handler" `
+        --tracing-config Mode=Active `
         --environment "file://$env:TEMP/test12-ws-env.json" `
         --region $REGION | Out-Null
     Write-Host "  Lambda $WS_NAME updated."
@@ -370,6 +378,21 @@ Write-Host "  Env vars updated on all Lambdas."
 Write-Host "`n  Setting up Function URLs..."
 $WEB_URL = Ensure-FunctionUrl -FnName $APP_NAME
 $MCP_URL = Ensure-FunctionUrl -FnName $MCP_NAME
+
+# ── 9. CloudWatch observability — alarms (Epic 7 / Story 7.6) ──
+# Idempotent: ensures the test12-alerts SNS topic and upserts the alarms.
+# Non-fatal — a missing cloudwatch:PutMetricAlarm / sns:CreateTopic grant on the
+# deploying principal should warn, not abort an otherwise-good code deploy.
+Write-Host "`nStep 9 - Provisioning CloudWatch observability (alarms + dashboard)..." -ForegroundColor Yellow
+$env:AWS_REGION = $REGION
+node scripts/cloudwatch/provision-alarms.js
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  WARNING: alarm provisioning failed (exit $LASTEXITCODE). Check IAM (cloudwatch:PutMetricAlarm, sns:CreateTopic) — code deploy is unaffected." -ForegroundColor Yellow
+}
+node scripts/cloudwatch/provision-dashboard.js
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  WARNING: dashboard provisioning failed (exit $LASTEXITCODE). Check IAM (cloudwatch:PutDashboard) — code deploy is unaffected." -ForegroundColor Yellow
+}
 
 Write-Host "`nDeployment complete!" -ForegroundColor Green
 Write-Host "Web UI (PROD) : $WEB_URL" -ForegroundColor Cyan

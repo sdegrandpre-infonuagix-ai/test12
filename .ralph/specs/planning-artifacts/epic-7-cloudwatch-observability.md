@@ -1,7 +1,9 @@
 ---
 epic: 7
 title: CloudWatch Observability
-status: in-progress
+status: complete
+completed: '2026-06-11'
+completionNote: 'All stories 7.1–7.7 implemented test-first (logger/EMF, request middleware, domain metrics, error+cold-start, X-Ray, alarms→SNS, dashboard). Remaining real-world verification is post-deploy: confirm metrics/traces appear and alarms fire in CloudWatch.'
 supersedes: 'architecture.md Decision D2 (observability deferral)'
 created: '2026-06-11'
 owner: BMad
