@@ -355,6 +355,7 @@
         <div id="login-step-phone-num" style="display:none;margin-top:0.5rem">
           <div style="font-size:0.75rem;font-weight:600;color:#374151;margin-bottom:0.4rem">PHONE NUMBER</div>
           <input id="login-phone-input" class="login-input" type="tel"
+            aria-label="Phone number"
             placeholder="+1 (555) 000-0000" inputmode="tel" autocomplete="tel">
           <button class="login-btn" style="margin-top:0.6rem" onclick="sendPhoneOtp()">Send code</button>
           <button class="login-back" onclick="showProvidersStep()">← Back</button>
@@ -366,6 +367,7 @@
             Enter the 6-digit code sent to <strong id="login-phone-display"></strong>
           </p>
           <input id="login-otp-input" class="login-input" type="number"
+            aria-label="6-digit verification code"
             placeholder="123456" autocomplete="one-time-code"
             style="text-align:center;font-size:1.5rem;letter-spacing:0.25em">
           <button class="login-btn" style="margin-top:0.6rem" onclick="verifyPhoneOtp()">Verify code</button>
@@ -419,7 +421,7 @@
       <!-- Step 4: OTP (legacy / fallback) -->
       <div id="login-step-otp" style="display:none">
         <p class="hint">Enter the 6-digit code sent to your phone.</p>
-        <input id="login-otp" class="login-input" type="number" placeholder="123456" autocomplete="one-time-code" maxlength="6">
+        <input id="login-otp" class="login-input" type="number" aria-label="6-digit verification code" placeholder="123456" autocomplete="one-time-code" maxlength="6">
         <button id="login-verify-btn" class="login-btn">Verify</button>
         <button id="login-back-btn" style="background:none;border:none;color:#64748b;font-size:0.78rem;cursor:pointer;font-family:inherit;margin-top:-0.5rem;">← Back</button>
         <div id="login-otp-error" class="login-error" style="display:none"></div>
@@ -441,7 +443,7 @@
       <h2>Profile &amp; Plans</h2>
 
       <div class="pm-field">
-        <span class="pm-label">Username</span>
+        <label class="pm-label" for="pm-username">Username</label>
         <input class="pm-input" id="pm-username" readonly>
       </div>
 
@@ -497,6 +499,7 @@
     </p>
   </header>
 
+  <main>
   <div class="agent-card">
     <div class="orb-wrap">
       <div class="orb" id="orb"></div>
@@ -518,6 +521,7 @@
     <div id="text-prompt-form" class="flex gap-[0.5rem] mt-[0.6rem]">
       <input id="text-prompt-input"
         type="text"
+        aria-label="Type a command to the agent"
         placeholder="Type a command…"
         autocomplete="off"
         class="flex-1 px-[0.75rem] py-[0.5rem] rounded-[10px] border border-[#334155] bg-[#1e293b] text-[#f1f5f9] text-[0.85rem] outline-none"
@@ -538,7 +542,7 @@
       <form class="compose-form" id="compose-public" onsubmit="return false"
             mcp-tool mcp-name="create_post" mcp-description="Create a new public post on Test12."
             method="POST" action="/api/voice-posts">
-        <input class="compose-input" placeholder="Write a post…" autocomplete="off" maxlength="500"
+        <input class="compose-input" aria-label="Write a public post" placeholder="Write a post…" autocomplete="off" maxlength="500"
                name="text" mcp-name="text" mcp-description="The post content" required>
         <input type="hidden" name="author" mcp-name="author" mcp-description="Author display name">
         <button class="compose-btn" type="submit">Post</button>
@@ -567,11 +571,13 @@
     <p style="font-size:0.75rem;color:#64748b;margin-bottom:0.5rem">Your private nicknames for friends' public usernames — only you see these.</p>
     <div id="aliases-list"></div>
     <form id="alias-form" style="display:flex;gap:0.4rem;margin-top:0.6rem" onsubmit="return false">
-      <input id="alias-username-input" placeholder="Username (e.g. GorillaNK4P)" style="flex:1;padding:6px 10px;background:rgba(21,149,178,0.08);border:1px solid rgba(21,149,178,0.3);border-radius:8px;color:#e2e8f0;font-size:0.8rem;font-family:inherit;outline:none">
-      <input id="alias-name-input" placeholder="Nickname" style="flex:1;padding:6px 10px;background:rgba(21,149,178,0.08);border:1px solid rgba(21,149,178,0.3);border-radius:8px;color:#e2e8f0;font-size:0.8rem;font-family:inherit;outline:none">
+      <input id="alias-username-input" aria-label="Username to alias" placeholder="Username (e.g. GorillaNK4P)" style="flex:1;padding:6px 10px;background:rgba(21,149,178,0.08);border:1px solid rgba(21,149,178,0.3);border-radius:8px;color:#e2e8f0;font-size:0.8rem;font-family:inherit;outline:none">
+      <input id="alias-name-input" aria-label="Nickname for this user" placeholder="Nickname" style="flex:1;padding:6px 10px;background:rgba(21,149,178,0.08);border:1px solid rgba(21,149,178,0.3);border-radius:8px;color:#e2e8f0;font-size:0.8rem;font-family:inherit;outline:none">
       <button onclick="saveAliasFromForm()" style="padding:6px 12px;background:#1595b2;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.8rem">✓</button>
     </form>
   </div>
+
+  </main>
 
   <!-- ═══ FOOTER ═══ -->
   <!-- Add-on usage bars — bottom of page, above footer -->
@@ -2671,7 +2677,7 @@ async function loadPrivateChannels() {
           <div class="ch-empty">Click to view messages</div>
         </div>
         <form class="compose-form" id="compose-${ch.id}" onsubmit="return false">
-          <input class="compose-input" placeholder="Write a message…" autocomplete="off" maxlength="500">
+          <input class="compose-input" aria-label="Write a channel message" placeholder="Write a message…" autocomplete="off" maxlength="500">
           <button class="compose-btn" type="submit">Send</button>
         </form>
       </div>`;

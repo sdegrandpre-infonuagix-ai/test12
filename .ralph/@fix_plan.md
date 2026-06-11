@@ -14,11 +14,6 @@
 - [x] Story 0.7: Update sw.js to include dist/tailwind.css and bump CACHE_VERSION
 - [x] Story 0.8: Update deploy scripts to invoke build:css
 - [x] Story 0.9: Final regression pass on existing flows
-  > As a **test12 user**
-  > I want **every existing flow to work identically after migration**
-  > So that **the Tailwind migration is invisible to me as a user**.
-  > AC: Given Stories 0.1-0.8 are complete, When the operator runs through the regression test list manually, Then each of the following flows works identically to pre-migration state, on iPhone Safari, Android Chrome, and desktop Chrome/Safari/Firefox:, And post a voice post in public feed (PTT mode), And reply to a post in public feed, And create a private channel, And join a private channel by ID, And send a message in a private channel, And voice-command mode switching from within PTT (*"switch to Sonnet"*, *"use OpenAI"*, *"change to xAI"*), And auto-read narration in public feed, And sign in / sign out flow, And PWA install banner appears and install works, And the orb animation pulses correctly in `connecting` state, And typed-text fallback in the compose form works
-  > Spec: specs/planning-artifacts/epics.md#story-0-9
 - [ ] Story 0.10: Verify existing UI accessibility baseline (UX-DR17)
   > As a **test12 user with assistive needs**
   > I want **the existing header chrome and core flows to meet WCAG 2.1 AA before the switcher commits to AA**

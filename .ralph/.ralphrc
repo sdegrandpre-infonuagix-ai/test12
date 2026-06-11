@@ -18,10 +18,10 @@ PLATFORM_DRIVER="${PLATFORM_DRIVER:-claude-code}"
 # =============================================================================
 
 # Project name (used in prompts and logging)
-PROJECT_NAME="${PROJECT_NAME:-my-project}"
+PROJECT_NAME="${PROJECT_NAME:-test12}"
 
 # Project type: javascript, typescript, python, rust, go, unknown
-PROJECT_TYPE="${PROJECT_TYPE:-unknown}"
+PROJECT_TYPE="${PROJECT_TYPE:-javascript}"
 
 # =============================================================================
 # LOOP SETTINGS
@@ -135,7 +135,7 @@ QUALITY_GATE_ON_COMPLETION_ONLY="${QUALITY_GATE_ON_COMPLETION_ONLY:-false}"
 # - ultimate: review after every completed story (~20-30% more tokens)
 # The review agent analyzes git diffs and outputs findings for the next implementation loop.
 # Currently supported on Claude Code only.
-REVIEW_MODE="${REVIEW_MODE:-off}"
+REVIEW_MODE="${REVIEW_MODE:-enhanced}"
 
 # (Legacy) Enables review — prefer REVIEW_MODE instead
 REVIEW_ENABLED="${REVIEW_ENABLED:-false}"

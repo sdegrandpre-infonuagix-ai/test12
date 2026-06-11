@@ -9,7 +9,9 @@
     "dev": "node web.js",
     "dev:ui": "node dev.js",
     "build:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/dist/tailwind.css --minify",
-    "watch:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/dist/tailwind.css --watch"
+    "watch:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/dist/tailwind.css --watch",
+    "monitor:ralph": "node scripts/ralph-usage-monitor.mjs",
+    "monitor:ralph:once": "node scripts/ralph-usage-monitor.mjs --once"
   },
   "bin": {
     "test12": "./server.js"
